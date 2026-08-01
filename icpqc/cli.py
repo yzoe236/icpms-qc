@@ -81,6 +81,21 @@ def _cmd_template(args) -> int:
         print(f"icpqc: error: {exc}", file=sys.stderr)
         return 1
 
+    if args.resolve and v.ok and v.unknown_types:
+        plan = mapper.plan_resolution(tpl_yaml, args.export_csv)
+        if plan.empty and not plan.skipped:
+            print("icpqc: nothing to resolve — no unmapped types carry sample names")
+        else:
+            print("\nicpqc: some sample types stayed unmapped. Resolving them needs "
+                  "the names of\n       the rows that carry them — QC and standard "
+                  "rows, named by the lab.\n       Exactly this would be sent:")
+            print(plan.describe())
+            if plan.empty:
+                print("       nothing left to disclose; skipping the resolution pass")
+            else:
+                print("icpqc: asking the model to resolve them …")
+                tpl_yaml, v = mapper.resolve(tpl_yaml, args.export_csv, plan)
+
     print("\n─── draft template " + "─" * 52)
     print(tpl_yaml.rstrip())
     print("─── validation against this export " + "─" * 36)
@@ -132,6 +147,9 @@ def main(argv: list[str] | None = None) -> int:
                      help="write the draft after you have reviewed it")
     tpl.add_argument("--include-names", action="store_true",
                      help="include sample names verbatim (they may identify clients)")
+    tpl.add_argument("--resolve", action="store_true",
+                     help="second pass: disclose the names of rows whose sample type "
+                          "stayed unmapped (QC/standard rows only) to resolve them")
 
     args = parser.parse_args(argv)
     return {"check": _cmd_check,

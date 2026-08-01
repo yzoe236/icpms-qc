@@ -164,3 +164,126 @@ def test_review_report_never_stays_silent_about_a_gap(vendor_b):
 def test_review_report_states_the_failure_when_a_draft_does_not_parse():
     v = mapper.Validation(False, "ValueError: no analyte columns matched")
     assert "REJECTED" in mapper.review_report(v, None)
+
+
+# ── two-row headers: the shape that leaked measurements in the field ──────────
+TWO_ROW_HEADER = [
+    ["Sample", "", "", "", "", "56  Fe  [ No Gas ]", "", "59  Co  [ He ]", ""],
+    ["", "Rjct", "Type", "Level", "Sample Name", "Conc.", "Conc. RSD", "Conc.", "Conc. RSD"],
+]
+# A real sequence opens with rinses and blanks: mostly empty or textual cells. An
+# average over the first few rows reads as "not numeric" and hides the sub-header.
+TWO_ROW_BODY = [
+    ["115 In (ISTD): CPS RSD value 14.81 is above limit", "False", "", "", "rinse", "", "", "", ""],
+    ["", "False", "", "", "rinse", "", "", "", ""],
+    ["", "False", "CalBlk", "1", "calib blank 1", "0.000", "119.0", "0.000", "0.7"],
+    ["", "False", "CalStd", "5", "1000ppb 71A", "0.822", "13.5", "0.031", "1.1"],
+    ["", "False", "Sample", "", "Northside Well 4", "0.197", "14.4", "0.024", "0.8"],
+]
+
+
+@pytest.fixture
+def two_row(tmp_path):
+    p = tmp_path / "two_row.csv"
+    with open(p, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerows(TWO_ROW_HEADER)
+        w.writerows(TWO_ROW_BODY)
+    return str(p)
+
+
+def test_subheader_detected_despite_rinse_heavy_opening_rows(two_row):
+    rows = TWO_ROW_HEADER + TWO_ROW_BODY
+    assert mapper._looks_like_subheader(rows, len(TWO_ROW_HEADER[1]))
+
+
+def test_two_row_header_does_not_leak_measurements(two_row):
+    """Regression: a sub-header profiled as data made every measurement column look
+    like free text, and free-text columns list their values."""
+    blob = mapper.fingerprint(two_row).to_json()
+    for measurement in ("0.822", "119.0", "0.031", "14.4", "0.197"):
+        assert measurement not in blob, f"measurement {measurement} leaked"
+
+
+def test_two_row_header_still_shows_the_model_what_it_needs(two_row):
+    blob = mapper.fingerprint(two_row).to_json()
+    for structural in ("Conc.", "Type", "Level", "Sample Name", "56  Fe  [ No Gas ]"):
+        assert structural in blob, f"{structural!r} was masked; the model goes blind"
+
+
+def test_instrument_qc_blob_is_masked_and_clipped(two_row):
+    """Vendor QC warning text carries measured values inside prose."""
+    blob = mapper.fingerprint(two_row).to_json()
+    assert "14.81" not in blob
+
+
+def test_long_values_are_clipped():
+    assert len(mapper._clip("x" * 5000)) < mapper.MAX_VALUE_CHARS + 10
+
+
+# ── resolution pass: minimum disclosure, and only of QC rows ─────────────────
+RESOLVE_HEADER = ["No.", "Sample Id", "Sample Type", "Std Conc (ppb)",
+                  "Be 9 [ KED ] Concentration (ug/L)"]
+RESOLVE_ROWS = [
+    ["1", "ICV 25ppb", "QC Check", "25", "24.8"],
+    ["2", "CCV 50ppb", "QC Check", "50", "49.6"],
+    ["3", "Northside Well 1", "Unknown", "", "3.1"],
+    ["4", "Northside Well 2", "Unknown", "", "5.7"],
+    ["5", "Northside Well 3", "Unknown", "", "2.2"],
+    ["6", "Northside Well 4", "Unknown", "", "9.9"],
+    ["7", "Northside Well 5", "Unknown", "", "1.4"],
+]
+RESOLVE_TEMPLATE = r"""id: r
+instrument_family: unknown
+columns:
+  sample_name: "Sample Id"
+  sample_type: "Sample Type"
+analyte_conc_pattern: '^(?P<label>.+?) Concentration \((?P<unit>[^)]+)\)$'
+sample_type_vocab: {}
+"""
+
+
+@pytest.fixture
+def resolve_file(tmp_path):
+    p = tmp_path / "r.csv"
+    with open(p, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(RESOLVE_HEADER)
+        w.writerows(RESOLVE_ROWS)
+    return str(p)
+
+
+def test_resolution_discloses_qc_rows_only(resolve_file):
+    plan = mapper.plan_resolution(RESOLVE_TEMPLATE, resolve_file)
+    assert plan.names_by_type["QC Check"] == ["ICV 25ppb", "CCV 50ppb"]
+    assert "Unknown" not in plan.names_by_type, "client sample names were disclosed"
+    assert "Unknown" in plan.skipped
+
+
+def test_resolution_withholds_a_type_that_dominates_the_batch(resolve_file):
+    """A type covering most rows is the samples, whatever it happens to be called."""
+    plan = mapper.plan_resolution(RESOLVE_TEMPLATE, resolve_file)
+    assert "too many to be QC" in plan.skipped["Unknown"]
+
+
+def test_resolution_skips_types_already_mapped(resolve_file):
+    mapped = RESOLVE_TEMPLATE.replace("sample_type_vocab: {}",
+                                      'sample_type_vocab:\n  "QC Check": CCV')
+    plan = mapper.plan_resolution(mapped, resolve_file)
+    assert "QC Check" not in plan.names_by_type
+
+
+def test_disclosure_can_be_shown_before_it_is_sent(resolve_file):
+    described = mapper.plan_resolution(RESOLVE_TEMPLATE, resolve_file).describe()
+    assert "ICV 25ppb" in described and "withheld" in described
+
+
+def test_merge_fragment_adds_vocabulary_without_losing_the_template():
+    merged = mapper.merge_fragment(
+        RESOLVE_TEMPLATE,
+        'sample_type_vocab:\n  "QC Check": CCV\nparent_rules:\n'
+        '  - {type: DUP, name_suffix: "-DUP"}\n')
+    data = __import__("yaml").safe_load(merged)
+    assert data["sample_type_vocab"]["QC Check"] == "CCV"
+    assert data["parent_rules"][0]["name_suffix"] == "-DUP"
+    assert data["analyte_conc_pattern"], "the original template was damaged"

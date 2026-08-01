@@ -46,6 +46,14 @@ from icpqc.io import masshunter, templates
 MAX_SCAN_ROWS = 400
 MAX_DISTINCT = 12
 CATEGORICAL_MAX = 15
+MAX_VALUE_CHARS = 160        # instrument QC blobs run to thousands of characters
+
+
+SHORT_VALUE_CHARS = 24       # beyond this a cell is prose, not a code
+
+
+def _clip(value: str) -> str:
+    return value if len(value) <= MAX_VALUE_CHARS else value[:MAX_VALUE_CHARS] + " …"
 
 # ── redaction ────────────────────────────────────────────────────────────────
 # Data cells are masked unless every token is recognizably lab vocabulary. The
@@ -109,6 +117,18 @@ def _token_safe(tok: str, has_mass_context: bool = False,
     return (t in _QC_WORDS or t in _UNITS or _compound_safe(t)
             or bool(re.fullmatch(r"(?:std|lvl|level|l|cal|qc|ccv)\d+", t))
             or bool(re.fullmatch(r"\d+(?:ppb|ppm|ppt|mg/l|ug/l|%)", t)))
+
+
+def _redact_cell(value: str) -> str:
+    """Redact a data cell, deciding about bare numbers by the shape of the value.
+
+    Short cells are codes and levels — "3", "1000ppb 71A" — and the model needs
+    them. Long cells are prose: sample descriptions, or the instrument's own QC
+    warnings, whose embedded numbers *are* measurements ("CPS RSD value 14.81").
+    Length, not the column's cardinality, is what separates the two: a one-batch
+    export can carry a single distinct warning blob and still look categorical.
+    """
+    return redact(value, allow_bare_numbers=len(value) <= SHORT_VALUE_CHARS)
 
 
 def redact(value: str, allow_bare_numbers: bool = True) -> str:
@@ -190,6 +210,34 @@ def _read_rows(path: str) -> tuple[list[list[str]], str]:
     raise ValueError(f"{path}: could not decode with utf-8/cp1252/latin-1")
 
 
+def _looks_like_subheader(rows: list[list[str]], width: int) -> bool:
+    """Is row 1 a second header row rather than the first data row?
+
+    This matters more than it looks: if a sub-header row is profiled as data, every
+    measurement column contains one text cell, stops looking numeric, and gets its
+    values listed in the fingerprint — which is exactly how concentrations would
+    leak. Real two-row exports are common (analyte labels above Conc./CPS/RSD), so
+    detect them rather than trust a flag.
+    """
+    if len(rows) < 3:
+        return False
+
+    def numeric_share(row: list[str]) -> float:
+        cells = [(row[i].strip() if i < len(row) else "") for i in range(width)]
+        filled = [c for c in cells if c]
+        if not filled:
+            return 0.0
+        return sum(bool(_NUMERIC.match(c)) for c in filled) / len(filled)
+
+    # Take the *best* data row in a wide window, not an average of the first few:
+    # real sequences open with rinses and blanks whose cells are empty or textual,
+    # and averaging over them hides the numeric rows that prove row 1 is a header.
+    below = [numeric_share(r) for r in rows[2:40]]
+    if not below:
+        return False
+    return numeric_share(rows[1]) < 0.2 and max(below) > 0.5
+
+
 def fingerprint(path: str, include_names: bool = False,
                 head: int = 3) -> Fingerprint:
     """Extract layout-only structure from an unfamiliar export.
@@ -212,7 +260,9 @@ def fingerprint(path: str, include_names: bool = False,
                           else redact(c.strip(), allow_bare_numbers=False)
                           for c in r])
 
-    body = rows[1:]
+    # Profile only true data rows, so a sub-header cannot disguise a measurement
+    # column as free text.
+    body = rows[2:] if _looks_like_subheader(rows, width) else rows[1:]
     profiles = []
     for i in range(width):
         col = [(r[i].strip() if i < len(r) else "") for r in body]
@@ -221,21 +271,21 @@ def fingerprint(path: str, include_names: bool = False,
         if not nonempty:
             profiles.append(ColumnProfile(i, header, "empty"))
             continue
-        if all(_NUMERIC.match(v) for v in nonempty):
+
+        numeric_share = sum(bool(_NUMERIC.match(v)) for v in nonempty) / len(nonempty)
+        if numeric_share > 0.5:
+            # Predominantly numeric: measurements. Report the shape, never the values.
             profiles.append(ColumnProfile(i, header, "numeric",
                                           distinct=len(set(nonempty))))
             continue
+
         distinct = sorted(set(nonempty))
-        if len(distinct) <= CATEGORICAL_MAX:
-            vals = distinct[:MAX_DISTINCT]
-            profiles.append(ColumnProfile(
-                i, header, "categorical", len(distinct),
-                vals if include_names else [redact(v) for v in vals]))
-        else:
-            sample = distinct[:4]
-            profiles.append(ColumnProfile(
-                i, header, "text", len(distinct),
-                sample if include_names else [redact(v) for v in sample]))
+        categorical = len(distinct) <= CATEGORICAL_MAX
+        kind = "categorical" if categorical else "text"
+        sample = [_clip(v) for v in distinct[:MAX_DISTINCT if categorical else 4]]
+        profiles.append(ColumnProfile(
+            i, header, kind, len(distinct),
+            sample if include_names else [_redact_cell(v) for v in sample]))
 
     return Fingerprint(path, enc, width, len(body), head_rows, profiles,
                        include_names)
@@ -459,3 +509,148 @@ def draft(export_csv: str, template_id: str | None = None,
         tpl_yaml = re.sub(r"^\s*id\s*:.*$", f"id: {template_id}", tpl_yaml,
                           count=1, flags=re.M)
     return tpl_yaml, validate(tpl_yaml, export_csv), fp
+
+
+# ── second pass: resolve ambiguous sample types ──────────────────────────────
+# Masking names is what keeps client data home, and it is also what stops the first
+# pass from telling ICV from CCV — the two are distinguished only by what the rows
+# are called. The resolution is not to unmask everything, but to unmask the few rows
+# that carry an unresolved type: those are standards and QC aliquots, named by the
+# lab ("CCV 50ppb"), not by its clients.
+MAX_RESOLVE_ROWS = 24        # a batch's QC rows are few; anything more is samples
+MAX_RESOLVE_SHARE = 0.30     # a type covering a third of the batch is the samples
+
+
+@dataclass
+class Disclosure:
+    """What a resolution pass would reveal, so it can be shown before it is sent."""
+    names_by_type: dict[str, list[str]]
+    skipped: dict[str, str]                       # type value -> why it was skipped
+
+    @property
+    def empty(self) -> bool:
+        return not self.names_by_type
+
+    def describe(self) -> str:
+        lines = []
+        for tval, names in self.names_by_type.items():
+            lines.append(f"    {tval!r}: {', '.join(repr(n) for n in names)}")
+        for tval, why in self.skipped.items():
+            lines.append(f"    {tval!r}: withheld — {why}")
+        return "\n".join(lines)
+
+
+def _column_index(names: list[str], target: str) -> int | None:
+    return names.index(target) if target in names else None
+
+
+def plan_resolution(template_yaml: str, export_csv: str) -> Disclosure:
+    """Decide which sample names a resolution pass would disclose, and which not."""
+    data = yaml.safe_load(template_yaml) or {}
+    cols = data.get("columns") or {}
+    type_col, name_col = cols.get("sample_type"), cols.get("sample_name")
+    mapped = set((data.get("sample_type_vocab") or {}).keys())
+    if not type_col or not name_col:
+        return Disclosure({}, {})
+
+    # Resolve column positions the way the parser will, so a two-row header's
+    # "label :: sub" naming lines up with what the template declares.
+    tmp = Path(tempfile.mkdtemp(prefix="icpqc_res_")) / "t.template.yaml"
+    tmp.write_text(template_yaml, encoding="utf-8")
+    try:
+        tpl = templates.load(str(tmp))
+    except (ValueError, KeyError):
+        return Disclosure({}, {})
+    rows, _ = _read_rows(export_csv)
+    if len(rows) <= tpl.header_rows:
+        return Disclosure({}, {})
+    names, body = masshunter._logical_header(rows, tpl)
+
+    ti, ni = _column_index(names, type_col), _column_index(names, name_col)
+    if ti is None or ni is None:
+        return Disclosure({}, {})
+
+    buckets: dict[str, list[str]] = {}
+    for row in body:
+        tval = (row[ti].strip() if ti < len(row) else "")
+        if not tval or tval in mapped:
+            continue
+        nval = (row[ni].strip() if ni < len(row) else "")
+        if nval:
+            buckets.setdefault(tval, []).append(nval)
+
+    total = max(len(body), 1)
+    disclose, skipped = {}, {}
+    for tval, vals in buckets.items():
+        if len(vals) > MAX_RESOLVE_ROWS or len(vals) / total > MAX_RESOLVE_SHARE:
+            skipped[tval] = (f"{len(vals)} rows ({len(vals) / total:.0%} of the batch)"
+                             f" — too many to be QC; these look like client samples")
+            continue
+        seen, uniq = set(), []
+        for v in vals:
+            if v not in seen:
+                seen.add(v)
+                uniq.append(v)
+        disclose[tval] = uniq
+    return Disclosure(disclose, skipped)
+
+
+_RESOLVE_PROMPT = """\
+You previously drafted this icpqc template. Some sample-type strings were left \
+unmapped because their canonical role could not be told apart from layout alone. \
+Here are the sample names of the rows carrying each unresolved type — these are \
+calibration standards and QC aliquots named by the lab, disclosed for this purpose \
+only.
+
+UNRESOLVED TYPES AND THE NAMES OF THEIR ROWS:
+{disclosure}
+
+CURRENT TEMPLATE:
+{template}
+
+Decide, for each unresolved type string, whether the names now determine its \
+canonical role. Choose from: CAL_BLANK CAL_STD ICV ICB CCV CCB MB LCS LCSD SAMPLE \
+DUP MS MSD SERIAL_DIL OTHER.
+
+If one type string clearly covers two different roles (for example both an initial \
+and a continuing verification), say so in a NOTE and leave it unmapped — a template \
+cannot split one string two ways, and a wrong choice corrupts the checks that \
+depend on it.
+
+Also propose parent_rules if the names reveal a suffix convention linking a QC \
+aliquot to its parent sample (e.g. "-DUP", " MS").
+
+Return ONLY a YAML fragment with at most these two keys — no prose, no fences:
+
+  sample_type_vocab:      # ONLY the newly resolved entries
+    <string>: <TYPE>
+  parent_rules:           # omit entirely if no convention is visible
+    - {{type: DUP, name_suffix: "-DUP"}}
+
+After the YAML, append `# NOTE:` lines for anything you left unresolved and why.
+"""
+
+
+def merge_fragment(template_yaml: str, fragment_yaml: str) -> str:
+    """Fold resolved vocabulary into the template, preserving everything else."""
+    frag = yaml.safe_load(fragment_yaml) or {}
+    if not isinstance(frag, dict):
+        return template_yaml
+    data = yaml.safe_load(template_yaml) or {}
+    vocab = dict(data.get("sample_type_vocab") or {})
+    vocab.update(frag.get("sample_type_vocab") or {})
+    if vocab:
+        data["sample_type_vocab"] = vocab
+    if frag.get("parent_rules"):
+        data["parent_rules"] = frag["parent_rules"]
+    return yaml.safe_dump(data, sort_keys=False, allow_unicode=True,
+                          default_flow_style=False)
+
+
+def resolve(template_yaml: str, export_csv: str,
+            disclosure: Disclosure) -> tuple[str, Validation]:
+    """Second pass over the disclosed names; returns the merged, re-validated template."""
+    text = call_model(_RESOLVE_PROMPT.format(
+        disclosure=disclosure.describe(), template=template_yaml))
+    merged = merge_fragment(template_yaml, extract_yaml(text))
+    return merged, validate(merged, export_csv)
