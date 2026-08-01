@@ -42,6 +42,40 @@ icpqc check my_batch_export.csv --rules epa6020b --template masshunter_quant_wid
 # exit code: 0 = all pass, 2 = QC failures, 1 = error  (CI/automation friendly)
 ```
 
+## Your export doesn't match a template?
+
+Exports differ by vendor, software version, and report template, so the honest answer
+to "will it read my file?" used to be "after you write a YAML template." Now:
+
+```bash
+icpqc inspect my_export.csv                            # what does my layout look like?
+icpqc template-from-header my_export.csv --id my_lab   # draft a template for it
+icpqc template-from-header my_export.csv --id my_lab --accept
+```
+
+`template-from-header` extracts a **layout fingerprint** — column headers, per-column
+kind, categorical vocabularies — asks a language model to draft the template, then
+**validates the draft by parsing your actual export** and reports what it understood
+and what it did not. Nothing is written until you pass `--accept`.
+
+Three things this deliberately does *not* do:
+
+- **It never sends measurements.** The fingerprint carries layout, not values; free
+  text outside lab vocabulary is masked, so client sample names stay on your machine.
+  Run `icpqc inspect` to see exactly what would be sent. (`--include-names` opts out,
+  and tells you it did.)
+- **The model never judges QC.** It authors a template, once. After you accept it, the
+  layout is a plain YAML file and every future run is deterministic — the same export
+  produces the same report in three years, which is the point of a compliance tool.
+- **It never guesses quietly.** Ambiguous sample types are left unmapped and reported,
+  because a loud `NOT_EVALUATED` is worth more than a confident wrong answer.
+
+Needs the [`claude` CLI](https://claude.com/claude-code) or `ANTHROPIC_API_KEY`. Without
+either, `icpqc inspect` still works — hand the fingerprint to any model, or write the
+template yourself.
+
+## Quick start (continued)
+
 No real data at hand? Generate a synthetic demo batch:
 
 ```bash
