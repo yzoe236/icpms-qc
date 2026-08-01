@@ -1,0 +1,24 @@
+# Rule pack: EPA Method 200.8-style defaults (drinking/ambient waters).
+#
+# !! TYPICAL VALUES, NOT THE METHOD TEXT !!
+# Every threshold below MUST be verified against the current revision of EPA
+# 200.8 before any compliance use. Notable difference from the 6020B-style
+# pack: the internal-standard window.
+pack: epa200_8
+shared:
+  loq_ppb:
+    default: 0.1
+checks:
+  cal_linearity:   { enabled: true, params: { min_r: 0.998 },                             verify: "200.8 calibration acceptance" }
+  cal_low_std:     { enabled: true, params: { window_pct: [70, 130] },                    verify: "200.8 low-level standard practice" }
+  icv_recovery:    { enabled: true, params: { window_pct: [90, 110] },                    verify: "200.8 QCS/IPC acceptance" }
+  ccv_recovery:    { enabled: true, params: { window_pct: [90, 110] },                    verify: "200.8 continuing calibration (IPC)" }
+  ccv_frequency:   { enabled: true, params: { every_n: 10, end_of_run: true },            verify: "200.8 QC frequency" }
+  icb_ccb_blank:   { enabled: true, params: { limit: "LOQ" },                             verify: "200.8 calibration blank acceptance" }
+  method_blank:    { enabled: true, params: { limit: "LOQ" },                             verify: "200.8 laboratory reagent blank" }
+  istd_recovery:   { enabled: true, params: { window_pct: [60, 125], reference: "ical" }, verify: "200.8 internal standards — CONFIRM window vs current text" }
+  lcs_recovery:    { enabled: true, params: { window_pct: [85, 115] },                    verify: "200.8 LFB acceptance — CONFIRM" }
+  dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "200.8 duplicate criteria" }
+  ms_msd:          { enabled: true, params: { window_pct: [70, 130], max_rpd_pct: 20 },   verify: "200.8 LFM recovery — CONFIRM" }
+  serial_dilution: { enabled: false, params: { factor: 5, agreement_pct: 10, min_conc_x_loq: 50 }, verify: "not a standard 200.8 element — enable per lab SOP" }
+  seq_structure:   { enabled: true, params: { require: [ICV, ICB, MB, LCS] },             verify: "lab SOP / method QC section" }

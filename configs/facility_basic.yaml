@@ -1,0 +1,26 @@
+# Rule pack: research core-facility baseline.
+#
+# For batches run in a research-facility style (cal curve + standard re-reads
+# as QC + rinse blank verifies), where the EPA-style batch QC set (MB/LCS/
+# dup/spikes) is not part of the sequence. Evaluates what exists; the EPA-style
+# packs will loudly flag what doesn't. cal_linearity min_r mirrors MassHunter's
+# common default outlier threshold (0.95) so verdicts are comparable with the
+# instrument software's own flags. Adjust to your facility SOP and version in git.
+pack: facility_basic
+shared:
+  loq_ppb:
+    default: 0.1
+checks:
+  cal_linearity:   { enabled: true,  params: { min_r: 0.95 },                              verify: "facility SOP / MassHunter outlier setting" }
+  cal_low_std:     { enabled: true,  params: { window_pct: [70, 130] },                    verify: "facility SOP" }
+  icv_recovery:    { enabled: false, params: {} }
+  ccv_recovery:    { enabled: true,  params: { window_pct: [80, 120] },                    verify: "facility SOP (QC1-5 standard re-reads)" }
+  ccv_frequency:   { enabled: true,  params: { every_n: 30, end_of_run: true },            verify: "facility SOP" }
+  icb_ccb_blank:   { enabled: true,  params: { limit: "LOQ" },                             verify: "facility SOP (BlkVrfy rinses)" }
+  method_blank:    { enabled: false, params: {} }
+  istd_recovery:   { enabled: true,  params: { window_pct: [60, 130], reference: "ical" }, verify: "facility SOP" }
+  lcs_recovery:    { enabled: false, params: {} }
+  dup_rpd:         { enabled: false, params: {} }
+  ms_msd:          { enabled: false, params: {} }
+  serial_dilution: { enabled: false, params: {} }
+  seq_structure:   { enabled: true,  params: { require: [CCV, CCB] },                      verify: "facility SOP" }

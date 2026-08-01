@@ -1,0 +1,35 @@
+# Export-layout template: "masshunter_quant_wide" (v0.1 reference layout)
+#
+# Maps a wide quantitative CSV export to the canonical model. Real-world
+# MassHunter export layouts vary by software version and report template —
+# copy this file, adjust patterns/vocabulary for your lab's export, done.
+# Contributing your (redacted!) layout as a template + fixture is the single
+# most useful contribution to this project.
+id: masshunter_quant_wide
+instrument_family: agilent-masshunter
+columns:
+  seq: "Seq"
+  sample_name: "Sample Name"
+  sample_type: "Type"
+  level: "Level [ppb]"
+analyte_conc_pattern: '^(?P<label>.+?) Conc\. \[(?P<unit>[^\]]+)\]$'
+analyte_cps_pattern: '^(?P<label>.+?) CPS$'
+istd_cps_pattern: '^(?P<label>.+?) CPS \(ISTD\)$'
+sample_type_vocab:          # export string -> canonical SampleType
+  CalBlk: CAL_BLANK
+  CalStd: CAL_STD
+  ICV: ICV
+  ICB: ICB
+  CCV: CCV
+  CCB: CCB
+  MB: MB
+  LCS: LCS
+  Sample: SAMPLE
+  Dup: DUP
+  MS: MS
+  MSD: MSD
+# Unmapped type strings -> SampleType.OTHER + a Batch.warning (loud, never guessed)
+parent_rules:               # how QC aliquots point back to their parent sample
+  - { type: DUP, name_suffix: "-DUP" }
+  - { type: MS,  name_suffix: "-MS" }
+  - { type: MSD, name_suffix: "-MSD" }

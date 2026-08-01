@@ -1,0 +1,26 @@
+# Rule pack: EPA SW-846 6020B-style defaults.
+#
+# !! TYPICAL VALUES, NOT THE METHOD TEXT !!
+# Every threshold below MUST be verified against the current revision of the
+# method (see `verify:` notes) before any compliance use. Version this file in
+# git — your QC policy becomes reviewable and auditable.
+pack: epa6020b
+shared:
+  # Reporting/quantitation limits used by blank and RPD-threshold logic.
+  # Replace with your lab's per-analyte LOQs (label -> ppb); `default` covers the rest.
+  loq_ppb:
+    default: 0.1
+checks:
+  cal_linearity:   { enabled: true, params: { min_r: 0.998 },                             verify: "6020B ICAL acceptance criteria" }
+  cal_low_std:     { enabled: true, params: { window_pct: [70, 130] },                    verify: "6020B low-level standard check" }
+  icv_recovery:    { enabled: true, params: { window_pct: [90, 110] },                    verify: "6020B initial calibration verification" }
+  ccv_recovery:    { enabled: true, params: { window_pct: [90, 110] },                    verify: "6020B continuing calibration verification" }
+  ccv_frequency:   { enabled: true, params: { every_n: 10, end_of_run: true },            verify: "6020B QC frequency requirements" }
+  icb_ccb_blank:   { enabled: true, params: { limit: "LOQ" },                             verify: "6020B calibration blank acceptance" }
+  method_blank:    { enabled: true, params: { limit: "LOQ" },                             verify: "6020B method blank acceptance" }
+  istd_recovery:   { enabled: true, params: { window_pct: [70, 130], reference: "ical" }, verify: "6020B internal standards — CONFIRM window vs current text (200.8 uses a different one)" }
+  lcs_recovery:    { enabled: true, params: { window_pct: [80, 120] },                    verify: "6020B LCS acceptance (or lab control limits)" }
+  dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "6020B duplicate criteria" }
+  ms_msd:          { enabled: true, params: { window_pct: [75, 125], max_rpd_pct: 20 },   verify: "6020B matrix spike criteria" }
+  serial_dilution: { enabled: true, params: { factor: 5, agreement_pct: 10, min_conc_x_loq: 50 }, verify: "6020B serial dilution test" }
+  seq_structure:   { enabled: true, params: { require: [ICV, ICB, MB, LCS] },             verify: "lab SOP / method QC section" }

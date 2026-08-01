@@ -1,0 +1,38 @@
+# Export-layout template: real-world MassHunter concentration export
+# ("two-row header" family, observed in the field 2026-07):
+#   row 1: analyte labels spanning column pairs — "56  Fe  [ No Gas ] ,,..."
+#   row 2: measure sub-headers — "Conc., Conc. RSD, ..."
+#   col 1: unnamed column carrying MassHunter's own QC flag text
+#   Level column holds a level INDEX (1..n) — expected conc lives in the sample
+#   name ("100ppb 71A"); QC1..QC5 are re-reads of the cal standards (≈ CCV).
+# Encoding is ANSI (cp1252), not UTF-8.
+id: masshunter_conc_2row
+instrument_family: agilent-masshunter
+encoding: cp1252
+header_rows: 2
+header_group_labels: ["Sample"]
+columns:
+  sample_name: "Sample Name"
+  sample_type: "Type"
+  level: "Level"
+  flags: "Sample"          # the unnamed first column inherits the group label
+level_is_index: true
+expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*ppb'
+analyte_conc_pattern: '^(?P<label>.+?)\s*::\s*Conc\.(\s*\[\s*(?P<unit>[^\]]+)\s*\])?$'
+istd_label_pattern: 'ISTD'
+ignore_patterns:
+  - 'RSD$'
+  - '^Rjct$'
+  - '^Acq\. Date-Time$'
+  - '^Comment$'
+  - '^Vial Number$'
+sample_type_vocab:
+  CalBlk: CAL_BLANK
+  CalStd: CAL_STD
+  QC1: CCV
+  QC2: CCV
+  QC3: CCV
+  QC4: CCV
+  QC5: CCV
+  BlkVrfy: CCB
+  Sample: SAMPLE

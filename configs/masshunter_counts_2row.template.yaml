@@ -1,0 +1,34 @@
+# Export-layout template: real-world MassHunter counts (CPS) export — the
+# companion file of masshunter_conc_2row. Same two-row header family; measure
+# sub-headers are "CPS, CPS RSD". Main use: real ISTD intensities for the
+# istd_recovery check (the concentration export has no raw counts).
+id: masshunter_counts_2row
+instrument_family: agilent-masshunter
+encoding: cp1252
+header_rows: 2
+header_group_labels: ["Sample"]
+columns:
+  sample_name: "Sample Name"
+  sample_type: "Type"
+  level: "Level"
+  flags: "Sample"
+level_is_index: true
+expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*ppb'
+analyte_cps_pattern: '^(?P<label>.+?)\s*::\s*CPS$'
+istd_label_pattern: 'ISTD'
+ignore_patterns:
+  - 'RSD$'
+  - '^Rjct$'
+  - '^Acq\. Date-Time$'
+  - '^Comment$'
+  - '^Vial Number$'
+sample_type_vocab:
+  CalBlk: CAL_BLANK
+  CalStd: CAL_STD
+  QC1: CCV
+  QC2: CCV
+  QC3: CCV
+  QC4: CCV
+  QC5: CCV
+  BlkVrfy: CCB
+  Sample: SAMPLE

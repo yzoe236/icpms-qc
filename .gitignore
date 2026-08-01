@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project
+out/
+out_*/
+*.sqlite
+demo_batch*.csv
+bad_batch*.csv
+
+# NEVER commit real lab exports — synthetic/redacted fixtures only (tests/fixtures/)
+
+# Private working notes — local only, never published (contains personal/employment context)
+CLAUDE.md
