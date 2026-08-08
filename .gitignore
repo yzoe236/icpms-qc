@@ -23,3 +23,6 @@ bad_batch*.csv
 
 # Private working notes — local only, never published (contains personal/employment context)
 CLAUDE.md
+
+# Inter-agent handoff inbox — local coordination, never part of the project
+_handoff/
