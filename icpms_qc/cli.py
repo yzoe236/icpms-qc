@@ -21,6 +21,8 @@ from icpms_qc.report import render
 def _cmd_check(args) -> int:
     try:
         batch = masshunter.parse(args.export_csv, template=args.template)
+        if args.counts:
+            masshunter.attach_intensities(batch, args.counts, template=args.counts_template)
         if args.laser_log:
             from icpms_qc.io import laserlog
             if not laserlog.looks_like_laser_log(args.laser_log):
@@ -139,6 +141,12 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--template", default="masshunter_quant_wide",
                        help="export-layout template name or path to YAML")
     check.add_argument("--out", default="out", help="output directory for reports")
+    check.add_argument("--counts", help="companion counts export for the same batch "
+                       "(Count_*.csv beside Conc_*.csv) — merges raw intensities so "
+                       "quant_crosscheck can verify the reported concentrations")
+    check.add_argument("--counts-template", dest="counts_template",
+                       default="masshunter_counts_2row",
+                       help="layout template for the --counts file")
     check.add_argument("--laser-log", dest="laser_log",
                        help="laser ablation log CSV (iolite/NWL style) — enables "
                             "laser_log_alignment, which audits whether the results "

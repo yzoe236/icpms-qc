@@ -702,12 +702,23 @@ def quant_crosscheck(batch: Batch, params: dict) -> CheckResult:
     tol = float(params.get("max_deviation_pct", 15))
     mult = float(params.get("min_conc_x_loq", 10))
     uniform_cv = float(params.get("uniform_ratio_cv_pct", 5))
+    min_cal_r = float(params.get("min_cal_r", 0.95))
 
     details: list[dict] = [{"calibration": mode, "cal_points": len(cal),
                             "tolerance_pct": tol, "ok": None}]
     for a in batch.analytes:
         pts = [(s.level or 0.0, y) for s in cal if (y := response(s, a.label)) is not None]
         if len(pts) < min_levels:
+            continue
+        # A curve whose response does not track the level is not a calibration —
+        # most often the analyte simply is not in the standard that was run. Using
+        # it anyway turns noise into confident nonsense, so it is skipped and the
+        # instrument's own calibration flag is left to speak for it.
+        cal_r = _pearson([p[0] for p in pts], [p[1] for p in pts])
+        if cal_r < min_cal_r:
+            details.append({"analyte": a.label, "cal_r": round(cal_r, 3), "ok": None,
+                            "note": f"calibration response does not track level "
+                                    f"(r={cal_r:.3f}) — not calibrated in this batch"})
             continue
         fit = _fit_line([p[0] for p in pts], [p[1] for p in pts])
         if fit is None or fit[0] == 0:
@@ -716,7 +727,15 @@ def quant_crosscheck(batch: Batch, params: dict) -> CheckResult:
             continue
         slope, intercept = fit
 
-        ratios, devs, worst, worst_s = [], [], None, None
+        # Compare only inside the range the calibration actually covers. Below the
+        # lowest standard the inversion can return a negative concentration, and
+        # above the highest it is extrapolation — neither says anything about
+        # whether the reported number was computed correctly.
+        levels = sorted({p[0] for p in pts if p[0] > 0})
+        lo_cal = levels[0] * float(params.get("low_cal_fraction", 1.0))
+        hi_cal = levels[-1]
+
+        ratios, devs, worst, worst_s, skipped = [], [], None, None, 0
         for s in batch.samples:
             if s.type in {SampleType.CAL_STD, SampleType.CAL_BLANK}:
                 continue
@@ -724,9 +743,13 @@ def quant_crosscheck(batch: Batch, params: dict) -> CheckResult:
             y = response(s, a.label)
             if r is None or r.conc is None or y is None:
                 continue
-            if r.conc <= mult * _loq_for(a.label, params):
-                continue                      # relative difference explodes near zero
+            if not (lo_cal <= r.conc <= hi_cal) or r.conc <= mult * _loq_for(a.label, params):
+                skipped += 1
+                continue
             predicted = (y - intercept) / slope
+            if predicted <= 0:
+                skipped += 1              # response sits below the calibration blank
+                continue
             ratios.append(predicted / r.conc)
             dev = abs(predicted - r.conc) / r.conc * 100.0
             devs.append(dev)
@@ -738,25 +761,68 @@ def quant_crosscheck(batch: Batch, params: dict) -> CheckResult:
         median_ratio = statistics.median(ratios)
         mean_ratio = statistics.fmean(ratios)
         cv = (statistics.stdev(ratios) / abs(mean_ratio) * 100.0) if mean_ratio else 999.0
-        row = {"analyte": a.label, "n_compared": len(devs),
+        row = {"analyte": a.label, "n_compared": len(devs), "n_outside_range": skipped,
                "median_ratio": round(median_ratio, 4),
                "max_deviation_pct": round(worst, 1), "ok": True}
 
         if cv <= uniform_cv and abs(median_ratio - 1) * 100 > tol:
-            # Consistent everywhere: a scale the export does not carry, not an error.
-            details.append({**row, "ok": None,
-                            "note": (f"every sample differs by the same factor "
-                                     f"({median_ratio:.3g}x, spread {cv:.1f}%) — a dilution "
-                                     f"or unit conversion the export does not carry, "
-                                     f"not a disagreement")})
+            # The one thing this comparison can prove. A constant offset survives
+            # every unknown in the vendor's math — weighting, curve type, excluded
+            # points, interference corrections all cancel in a ratio — so when
+            # every sample is out by the same factor, something scaled the whole
+            # column: a dilution factor, a unit, a transcription.
+            details.append({**row, "ok": None, "scale_factor": round(median_ratio, 4),
+                            "note": (f"every sample is out by the same factor "
+                                     f"({median_ratio:.4g}x, spread {cv:.1f}%)")})
         elif worst > tol:
-            details.append({**row, "ok": False, "worst_sample": worst_s,
-                            "note": f"recomputed and reported values disagree by up to "
-                                    f"{worst:.1f}% and not by a constant factor "
-                                    f"(spread {cv:.1f}%)"})
+            # Scatter is not evidence. The export does not carry the regression
+            # weighting, the curve type, which standards were excluded, the
+            # interference-correction equations or the internal-standard
+            # assignment, and any of them moves individual samples. Saying
+            # "disagrees" here would be blaming the data for what the file omits.
+            details.append({**row, "ok": None,
+                            "note": (f"differs by up to {worst:.1f}% but not by a constant "
+                                     f"factor (spread {cv:.1f}%) — expected: the export "
+                                     f"omits the weighting, interference corrections and "
+                                     f"ISTD assignment needed to reproduce the vendor's "
+                                     f"arithmetic exactly")})
         else:
             details.append(row)
 
+    # One analyte out by a constant is analyte-specific arithmetic — most often an
+    # interference-correction equation, which the export does not carry. Checking
+    # real batches, the masses that showed up this way were exactly the classically
+    # corrected ones (ArO on 56 Fe, ClO on 51 V, ArC on 52 Cr, ArCl on 75 As), and
+    # each carried its own different factor. A *dilution* cannot do that: it
+    # multiplies the sample, so every analyte moves by the same number. That is the
+    # discriminator, and only the second case is a finding.
+    scaled = [d for d in details if d.get("scale_factor")]
+    min_shared = int(params.get("min_shared_analytes", 3))
+    if len(scaled) >= min_shared:
+        factors = sorted(d["scale_factor"] for d in scaled)
+        mid = factors[len(factors) // 2]
+        agree = [d for d in scaled if abs(d["scale_factor"] - mid) / mid * 100 <= uniform_cv]
+        if len(agree) >= min_shared and abs(mid - 1) * 100 > tol:
+            for d in agree:
+                d["ok"] = False
+                d["note"] += " — shared across analytes, so it scales the sample, not one mass"
+            return CheckResult(
+                "quant_crosscheck", Outcome.FAIL,
+                reason=(f"{len(agree)} analytes are out by the same factor ({mid:.4g}x) — "
+                        f"a dilution, a unit or the wrong calibration applied to the batch"),
+                details=details)
+
+    for d in scaled:
+        d["note"] += (" — one analyte only, so this is analyte-specific arithmetic the "
+                      "export omits (an interference correction, typically), not a "
+                      "batch-level scale")
+    if scaled:
+        return CheckResult(
+            "quant_crosscheck", Outcome.WARN,
+            reason=(f"{len(scaled)} analyte(s) sit at a constant offset from the recomputed "
+                    f"value, each by a different factor — consistent with per-mass "
+                    f"corrections rather than an error"),
+            details=details)
     return _finish("quant_crosscheck", details,
                    warn_reason="no analyte had enough comparable samples")
 

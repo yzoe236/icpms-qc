@@ -47,29 +47,61 @@ def test_recomputation_agrees_with_the_reference_batch(pass_csv):
     assert rows and all(d["max_deviation_pct"] < 15 for d in rows)
 
 
-def test_a_uniform_factor_is_explained_not_failed(pass_csv, tmp_path):
-    """A dilution the export does not carry shifts every sample identically.
+def test_a_uniform_factor_is_the_finding(pass_csv, tmp_path):
+    """The one disagreement this comparison can prove.
 
-    Reporting that as a disagreement would cry wolf on every diluted batch, so it
-    is surfaced as a scale factor to account for instead.
+    Every unknown in the vendor's arithmetic — weighting, curve type, excluded
+    standards, interference corrections — cancels in a ratio. So a column that is
+    out by the same factor everywhere was scaled by something: a dilution factor,
+    a unit, a transcription.
     """
     src = _scaled(pass_csv, tmp_path, lambda i: 2.0)
     res = checks.quant_crosscheck(masshunter.parse(str(src)), P)
-    assert res.outcome != Outcome.FAIL
-    row = next(d for d in res.details if d.get("n_compared"))
+    assert res.outcome == Outcome.FAIL
+    assert "same factor" in res.reason
+    row = next(d for d in res.details if d.get("scale_factor"))
+    assert row["ok"] is False
+    assert row["scale_factor"] == pytest.approx(0.5, abs=0.02)   # predicted/reported
+    assert "scales the sample, not one mass" in row["note"]
+
+
+def test_one_analyte_alone_is_not_a_dilution(pass_csv, tmp_path):
+    """A single mass at a constant offset is per-mass arithmetic, not a scale error.
+
+    Real batches put exactly the classically interference-corrected masses here —
+    ArO on 56 Fe, ClO on 51 V, ArC on 52 Cr — each with its own different factor.
+    A dilution multiplies the whole sample, so it cannot single one mass out.
+    """
+    import csv as _csv
+    rows = list(_csv.DictReader(open(pass_csv, newline="", encoding="utf-8")))
+    fields = list(rows[0])
+    for r in rows:
+        if r["Type"] not in {"CalStd", "CalBlk"} and r["9 Be Conc. [ppb]"]:
+            r["9 Be Conc. [ppb]"] = f"{float(r['9 Be Conc. [ppb]']) * 1.6:.4f}"
+    src = tmp_path / "one.csv"
+    with open(src, "w", newline="", encoding="utf-8") as fh:
+        w = _csv.DictWriter(fh, fieldnames=fields); w.writeheader(); w.writerows(rows)
+
+    res = checks.quant_crosscheck(masshunter.parse(str(src)), P)
+    assert res.outcome == Outcome.WARN            # reported, not blamed
+    row = next(d for d in res.details if d.get("scale_factor"))
     assert row["ok"] is None
-    assert "same factor" in row["note"]
-    assert row["median_ratio"] == pytest.approx(0.5, abs=0.02)   # predicted/reported
+    assert "interference correction" in row["note"]
 
 
-def test_scattered_disagreement_is_a_finding(pass_csv, tmp_path):
-    """Not a constant factor — that is the signature of a real problem."""
+def test_scattered_disagreement_is_reported_but_never_failed(pass_csv, tmp_path):
+    """Scatter is not evidence, and real batches produce plenty of it.
+
+    Checking against real exports showed individual samples differing for reasons
+    the file does not record. Failing on that would blame the batch for what the
+    export omits, so it is shown and explained instead.
+    """
     src = _scaled(pass_csv, tmp_path, lambda i: 1.0 + 0.4 * (i % 3))
     res = checks.quant_crosscheck(masshunter.parse(str(src)), P)
-    assert res.outcome == Outcome.FAIL
-    bad = [d for d in res.details if d.get("ok") is False]
-    assert bad and "not by a constant factor" in bad[0]["note"]
-    assert bad[0]["worst_sample"]
+    assert res.outcome != Outcome.FAIL
+    noted = [d for d in res.details if "not by a constant factor" in (d.get("note") or "")]
+    assert noted and all(d["ok"] is None for d in noted)
+    assert "omits" in noted[0]["note"]
 
 
 def test_an_export_without_intensities_cannot_be_cross_checked(pass_csv, tmp_path):

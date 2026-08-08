@@ -11,6 +11,7 @@ from __future__ import annotations
 import codecs
 import csv
 import re
+from pathlib import Path
 
 from icpms_qc.io import templates
 from icpms_qc.model import Analyte, Batch, InstrumentFlag, Result, Sample, SampleType
@@ -175,6 +176,67 @@ def _analyte_from_label(label: str) -> Analyte:
         mass_shift=int(shift) if shift else None,
         mode=_WS.sub(" ", mode).strip() if mode else None,
     )
+
+
+def attach_intensities(batch: Batch, counts_csv: str,
+                       template: str = "masshunter_counts_2row") -> None:
+    """Merge raw counts from a companion export into a concentration batch.
+
+    MassHunter's report templates emit either concentrations or counts, not both,
+    so a lab that wants both exports the batch twice — `Count_12052024.csv` beside
+    `Conc_12052024.csv`. Everything needed to check a reported concentration
+    against the signal it came from is therefore present, just split across two
+    files, and pairing them is all that stands in the way.
+
+    Samples are matched by position only when both exports describe the same
+    sequence, name for name. Anything else is matched by name, and an ambiguous
+    or missing name is reported rather than guessed — pairing the wrong two rows
+    would fabricate a disagreement out of nothing.
+    """
+    counts = parse(counts_csv, template=template)
+    names_a = [s.name for s in batch.samples]
+    names_b = [s.name for s in counts.samples]
+
+    if names_a == names_b:
+        pairs = list(zip(batch.samples, counts.samples))
+    else:
+        by_name: dict[str, list[Sample]] = {}
+        for s in counts.samples:
+            by_name.setdefault(s.name, []).append(s)
+        pairs = []
+        missing = ambiguous = 0
+        for s in batch.samples:
+            hits = by_name.get(s.name, [])
+            if len(hits) == 1:
+                pairs.append((s, hits[0]))
+            elif not hits:
+                missing += 1
+            else:
+                ambiguous += 1
+        batch.warnings.append(
+            f"counts export '{Path(counts_csv).name}' lists a different sequence; "
+            f"matched {len(pairs)} sample(s) by name"
+            + (f", {missing} not found" if missing else "")
+            + (f", {ambiguous} ambiguous" if ambiguous else ""))
+
+    shared = 0
+    for target, src in pairs:
+        for label, r in src.results.items():
+            dst = target.results.get(label)
+            if dst is None:
+                continue
+            if dst.intensity is None:
+                dst.intensity = r.intensity
+            if dst.rsd_pct is None:
+                dst.rsd_pct = r.rsd_pct
+            shared += 1
+        for k, v in src.istd_intensities.items():
+            target.istd_intensities.setdefault(k, v)
+
+    if not shared:
+        batch.warnings.append(
+            f"counts export '{Path(counts_csv).name}' shares no analyte labels with "
+            f"this batch — are they the same run?")
 
 
 def _read_raw(path: str, encoding: str) -> tuple[list[list[str]], str | None]:

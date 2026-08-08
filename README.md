@@ -131,12 +131,20 @@ its own raw intensities, and compares. The instrument software cannot raise this
 it *is* what produced the number — it applies the parameters it was given and does not
 doubt them. A dilution factor typed one digit wrong, an internal standard assigned to the
 wrong analyte, a stale calibration carried into a new batch: all produce confident,
-well-formatted, wrong results that every other QC check passes. A *uniform* offset is
-reported as a scale factor to account for rather than an error, since a dilution the
-export does not carry shifts every sample identically.
+well-formatted, wrong results that every other QC check passes. It reports one thing only, and that restraint is the point. An export does not carry the
+regression weighting, the curve type, the excluded standards or the interference-correction
+equations, so individual samples differ for reasons that say nothing about correctness.
+What survives every one of those unknowns is a *ratio*: when several analytes are out by
+the **same** factor, something scaled the sample — a dilution, a unit, the wrong
+calibration. One analyte alone at a constant offset is per-mass arithmetic (an
+interference correction, typically) and is shown rather than blamed.
 
-This needs concentrations and raw counts in the same file. Many report templates export
-one or the other — if yours does, `quant_crosscheck` says so instead of passing quietly.
+Counts and concentrations usually live in two files — `Count_0816.csv` beside
+`Conc_0816.csv`. Pass the companion with `--counts` and they are paired by sequence:
+
+```bash
+icpms-qc check Conc_0816.csv --counts Count_0816.csv --template masshunter_conc_2row
+```
 
 **The instrument's own verdict is carried, not discarded.** MassHunter writes its QC
 objections into the export. `instrument_flags` parses and reports them alongside icpms-qc's

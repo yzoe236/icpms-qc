@@ -32,7 +32,7 @@ checks:
   # Independently recomputes concentrations from the raw counts and compares.
   # A uniform offset is reported as a scale factor to explain, not as an error —
   # a dilution the export does not carry shifts every sample identically.
-  quant_crosscheck: { enabled: true, params: { max_deviation_pct: 20, min_levels: 3, min_conc_x_loq: 10, uniform_ratio_cv_pct: 5 }, verify: "lab SOP — this is a second opinion, not a certified quantitation path" }
+  quant_crosscheck: { enabled: true, params: { max_deviation_pct: 20, min_levels: 3, min_conc_x_loq: 10, uniform_ratio_cv_pct: 5, min_cal_r: 0.95, min_shared_analytes: 3 }, verify: "lab SOP — this is a second opinion, not a certified quantitation path" }
   crm_recovery:    { enabled: true,  params: { library: crm, window_pct: [80, 120] },      verify: "certificate of analysis" }
   dup_rpd:         { enabled: false, params: {} }
   ms_msd:          { enabled: false, params: {} }
