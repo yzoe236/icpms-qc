@@ -37,6 +37,10 @@ checks:
   lcs_recovery:    { enabled: true, params: { window_pct: [80, 120] },                    verify: "6020B LCS acceptance (or lab control limits)" }
   # Certified reference materials, per certified element. Values come from
   # configs/crm/*.yaml, matched to samples by name — see configs/crm/README.md.
+  # Independently recomputes concentrations from the raw counts and compares.
+  # A uniform offset is reported as a scale factor to explain, not as an error —
+  # a dilution the export does not carry shifts every sample identically.
+  quant_crosscheck: { enabled: true, params: { max_deviation_pct: 15, min_levels: 3, min_conc_x_loq: 10, uniform_ratio_cv_pct: 5 }, verify: "lab SOP — this is a second opinion, not a certified quantitation path" }
   crm_recovery:    { enabled: true, params: { library: crm, window_pct: [80, 120] },      verify: "certificate of analysis + lab control limits for CRMs" }
   dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "6020B duplicate criteria" }
   ms_msd:          { enabled: true, params: { window_pct: [75, 125], max_rpd_pct: 20 },   verify: "6020B matrix spike criteria" }

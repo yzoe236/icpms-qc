@@ -125,6 +125,19 @@ a finding. Validating against two real batches found icpms-qc silently reporting
 while the instrument software itself had raised 1218 objections, all of them precision or
 calibration; that is the hole this closes.
 
+**It can check the number against the counts it came from.** `quant_crosscheck`
+rebuilds the calibration from the standards in the same export, predicts each sample from
+its own raw intensities, and compares. The instrument software cannot raise this, because
+it *is* what produced the number — it applies the parameters it was given and does not
+doubt them. A dilution factor typed one digit wrong, an internal standard assigned to the
+wrong analyte, a stale calibration carried into a new batch: all produce confident,
+well-formatted, wrong results that every other QC check passes. A *uniform* offset is
+reported as a scale factor to account for rather than an error, since a dilution the
+export does not carry shifts every sample identically.
+
+This needs concentrations and raw counts in the same file. Many report templates export
+one or the other — if yours does, `quant_crosscheck` says so instead of passing quietly.
+
 **The instrument's own verdict is carried, not discarded.** MassHunter writes its QC
 objections into the export. `instrument_flags` parses and reports them alongside icpms-qc's
 own conclusions — they are the vendor's thresholds, so they are reported rather than
@@ -189,7 +202,7 @@ packs (`icpms_qc/configs/*.yaml`) parameterize with your method's limits.
 
 ## Status
 
-**v0.1 implemented**: reference-template parser, 20-check engine, CRM library, laser-log
+**v0.1 implemented**: reference-template parser, 21-check engine, CRM library, laser-log
 auditing, HTML + JSON reports, CLI — test suite green. Current phase: field-testing against real-world layouts.
 The single most useful contribution: a **redacted** export from your lab (fake sample
 names, real column layout) + the software version that produced it.

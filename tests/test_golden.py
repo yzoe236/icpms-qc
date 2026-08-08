@@ -9,7 +9,7 @@ ALL_CHECKS = {
     "icv_recovery", "ccv_recovery", "ccv_frequency", "icb_ccb_blank",
     "method_blank", "blank_derived_lod", "precision_rsd", "instrument_flags",
     "istd_recovery", "lcs_recovery",
-    "crm_recovery", "dup_rpd", "ms_msd", "serial_dilution",
+    "quant_crosscheck", "crm_recovery", "dup_rpd", "ms_msd", "serial_dilution",
     "laser_log_alignment", "seq_structure",
 }
 

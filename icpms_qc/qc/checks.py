@@ -636,6 +636,131 @@ def lcs_recovery(batch: Batch, params: dict) -> CheckResult:
     return _finish("lcs_recovery", _recovery_details(lcs, batch, lo, hi))
 
 
+def _fit_line(xs: list[float], ys: list[float]) -> tuple[float, float] | None:
+    """Ordinary least squares y = slope·x + intercept, or None if degenerate."""
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    if sxx <= 0:
+        return None
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+    return slope, my - slope * mx
+
+
+def quant_crosscheck(batch: Batch, params: dict) -> CheckResult:
+    """Recompute concentrations from raw counts and compare with the reported ones.
+
+    Every other check takes the reported concentration as given. This one asks
+    where that number came from: it builds a calibration out of the standards in
+    the same export, predicts each sample from its own counts, and compares.
+
+    The instrument software will never raise this, because it *is* the thing that
+    produced the number — it applies the parameters it was given and does not
+    doubt them. A dilution factor typed one digit wrong, an internal standard
+    assigned to the wrong analyte, a stale calibration carried into a new batch:
+    all of them produce confident, well-formatted, wrong results that every
+    downstream QC check happily passes.
+
+    A uniform offset is not a disagreement. If a dilution factor was applied that
+    the export does not carry, *every* sample differs by exactly that factor —
+    so a tight cluster of identical ratios is reported as a scale factor to
+    explain, while scattered disagreement is reported as a finding. Without that
+    distinction the check would cry wolf on every diluted batch.
+    """
+    cal = [s for s in batch.of_type(SampleType.CAL_STD) if s.level is not None]
+    cal += [s for s in batch.of_type(SampleType.CAL_BLANK)]      # the zero point
+    min_levels = int(params.get("min_levels", 3))
+    if len(cal) < min_levels:
+        return _ne("quant_crosscheck",
+                   f"need >={min_levels} calibration points with levels, found {len(cal)}")
+
+    have_cps = any(r.intensity is not None
+                   for s in batch.samples for r in s.results.values())
+    if not have_cps:
+        return _ne("quant_crosscheck", "export carries no raw intensities to recompute from")
+
+    # Internal-standard normalization only when the assignment is unambiguous.
+    # Guessing which ISTD belongs to which analyte would silently change every
+    # number this check produces.
+    istd_label = batch.istds[0].label if len(batch.istds) == 1 else None
+    if len(batch.istds) > 1:
+        mode = "external calibration (multiple ISTDs, assignment not exported)"
+    elif istd_label:
+        mode = f"internal-standard normalized to {istd_label}"
+    else:
+        mode = "external calibration (no ISTD in export)"
+
+    def response(sample, label) -> float | None:
+        r = sample.results.get(label)
+        if r is None or r.intensity is None:
+            return None
+        if istd_label:
+            i = sample.istd_intensities.get(istd_label)
+            return None if not i else r.intensity / i
+        return r.intensity
+
+    tol = float(params.get("max_deviation_pct", 15))
+    mult = float(params.get("min_conc_x_loq", 10))
+    uniform_cv = float(params.get("uniform_ratio_cv_pct", 5))
+
+    details: list[dict] = [{"calibration": mode, "cal_points": len(cal),
+                            "tolerance_pct": tol, "ok": None}]
+    for a in batch.analytes:
+        pts = [(s.level or 0.0, y) for s in cal if (y := response(s, a.label)) is not None]
+        if len(pts) < min_levels:
+            continue
+        fit = _fit_line([p[0] for p in pts], [p[1] for p in pts])
+        if fit is None or fit[0] == 0:
+            details.append({"analyte": a.label, "ok": None,
+                            "note": "calibration response is flat — cannot invert"})
+            continue
+        slope, intercept = fit
+
+        ratios, devs, worst, worst_s = [], [], None, None
+        for s in batch.samples:
+            if s.type in {SampleType.CAL_STD, SampleType.CAL_BLANK}:
+                continue
+            r = s.results.get(a.label)
+            y = response(s, a.label)
+            if r is None or r.conc is None or y is None:
+                continue
+            if r.conc <= mult * _loq_for(a.label, params):
+                continue                      # relative difference explodes near zero
+            predicted = (y - intercept) / slope
+            ratios.append(predicted / r.conc)
+            dev = abs(predicted - r.conc) / r.conc * 100.0
+            devs.append(dev)
+            if worst is None or dev > worst:
+                worst, worst_s = dev, s.name
+        if len(devs) < 2:
+            continue
+
+        median_ratio = statistics.median(ratios)
+        mean_ratio = statistics.fmean(ratios)
+        cv = (statistics.stdev(ratios) / abs(mean_ratio) * 100.0) if mean_ratio else 999.0
+        row = {"analyte": a.label, "n_compared": len(devs),
+               "median_ratio": round(median_ratio, 4),
+               "max_deviation_pct": round(worst, 1), "ok": True}
+
+        if cv <= uniform_cv and abs(median_ratio - 1) * 100 > tol:
+            # Consistent everywhere: a scale the export does not carry, not an error.
+            details.append({**row, "ok": None,
+                            "note": (f"every sample differs by the same factor "
+                                     f"({median_ratio:.3g}x, spread {cv:.1f}%) — a dilution "
+                                     f"or unit conversion the export does not carry, "
+                                     f"not a disagreement")})
+        elif worst > tol:
+            details.append({**row, "ok": False, "worst_sample": worst_s,
+                            "note": f"recomputed and reported values disagree by up to "
+                                    f"{worst:.1f}% and not by a constant factor "
+                                    f"(spread {cv:.1f}%)"})
+        else:
+            details.append(row)
+
+    return _finish("quant_crosscheck", details,
+                   warn_reason="no analyte had enough comparable samples")
+
+
 def crm_recovery(batch: Batch, params: dict) -> CheckResult:
     """Reference material recovery, per reference value.
 
@@ -956,6 +1081,7 @@ CATALOG = {
     "instrument_flags": instrument_flags,
     "istd_recovery": istd_recovery,
     "lcs_recovery": lcs_recovery,
+    "quant_crosscheck": quant_crosscheck,
     "crm_recovery": crm_recovery,
     "dup_rpd": dup_rpd,
     "ms_msd": ms_msd,

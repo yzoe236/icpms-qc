@@ -29,6 +29,10 @@ checks:
   instrument_flags: { enabled: true, params: { on_flag: warn, max_rows: 60 },        verify: "instrument software QC settings — whoever configured them" }
   istd_recovery:   { enabled: true, params: { window_pct: [60, 125], reference: "ical" }, verify: "200.8 internal standards — CONFIRM window vs current text" }
   lcs_recovery:    { enabled: true, params: { window_pct: [85, 115] },                    verify: "200.8 LFB acceptance — CONFIRM" }
+  # Independently recomputes concentrations from the raw counts and compares.
+  # A uniform offset is reported as a scale factor to explain, not as an error —
+  # a dilution the export does not carry shifts every sample identically.
+  quant_crosscheck: { enabled: true, params: { max_deviation_pct: 15, min_levels: 3, min_conc_x_loq: 10, uniform_ratio_cv_pct: 5 }, verify: "lab SOP — this is a second opinion, not a certified quantitation path" }
   crm_recovery:    { enabled: true, params: { library: crm, window_pct: [85, 115] },      verify: "certificate of analysis + lab control limits for CRMs" }
   dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "200.8 duplicate criteria" }
   ms_msd:          { enabled: true, params: { window_pct: [70, 130], max_rpd_pct: 20 },   verify: "200.8 LFM recovery — CONFIRM" }

@@ -101,6 +101,7 @@ packs — confirm against the current method text before compliance use.**
 | `instrument_flags` | the instrument software's own QC objections, carried into the report | reported; `on_flag: fail` to bind |
 | `istd_recovery` | ISTD intensity vs reference (ICAL std/blank) | 200.8-pack: 60–125% · 6020B-pack: 70–130% (**verify**) |
 | `lcs_recovery` | lab control sample | 80–120% |
+| `quant_crosscheck` | recomputes concentration from raw counts and compares with the reported value | ≤15% deviation; a uniform ratio is reported as a scale factor |
 | `crm_recovery` | certified reference material, per certified element | 80–120% vs `icpms_qc/configs/crm/*.yaml` |
 | `dup_rpd` | duplicate relative percent difference | ≤ 20% (when both > 5×LOQ) |
 | `ms_msd` | matrix spike / spike dup recovery + RPD | 75–125%, RPD ≤ 20% |
