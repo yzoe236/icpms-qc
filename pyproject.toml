@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "icpqc"                       # working name — verify availability on PyPI before release
+name = "icpms-qc"
 version = "0.1.0.dev0"
 description = "Post-run QC engine and audit-ready compliance reporter for ICP-MS batch exports"
 readme = "README.md"
@@ -26,8 +26,8 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-icpqc = "icpqc.cli:main"
+icpms-qc = "icpms_qc.cli:main"
 
 [project.urls]
-# Fill in after the personal-account repo exists:
-# Homepage = "https://github.com/<personal-account>/icpqc"
+Homepage = "https://github.com/yzoe236/icpms-qc"
+Issues = "https://github.com/yzoe236/icpms-qc/issues"

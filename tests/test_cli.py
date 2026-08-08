@@ -9,7 +9,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 def _run_cli(csv_path, out_dir):
     return subprocess.run(
-        [sys.executable, "-m", "icpqc.cli", "check", str(csv_path), "--out", str(out_dir)],
+        [sys.executable, "-m", "icpms_qc.cli", "check", str(csv_path), "--out", str(out_dir)],
         capture_output=True, text=True, cwd=REPO,
     )
 
@@ -23,7 +23,7 @@ def test_pass_batch_exits_zero(pass_csv, tmp_path):
     assert data["verdict"] == "PASS"
     assert len(data["checks"]) == 20
     html = (out / "qc_report.html").read_text(encoding="utf-8")
-    assert "icpqc QC report" in html and "ccv_recovery" in html
+    assert "icpms-qc QC report" in html and "ccv_recovery" in html
 
 
 def test_violation_batch_exits_two(fail_csv, tmp_path):

@@ -4,11 +4,11 @@ MassHunter censors a below-detection result rather than printing a number. Read
 naively that becomes None — indistinguishable from an analyte nobody measured —
 so a clean blank and an absent blank produce the same report. They must not.
 """
-from icpqc.io import masshunter
-from icpqc.io.masshunter import _parse_conc
-from icpqc.model import SampleType
-from icpqc.qc import checks
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.io.masshunter import _parse_conc
+from icpms_qc.model import SampleType
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import Outcome
 
 BE = "9 Be Conc. [ppb]"
 LOQ = {"loq_ppb": {"default": 0.1}, "limit": "LOQ"}

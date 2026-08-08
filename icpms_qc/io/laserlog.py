@@ -1,6 +1,6 @@
 """Laser ablation log (iolite/NWL-style CSV) → LaserLog.
 
-Why icpqc reads this at all
+Why icpms-qc reads this at all
 ---------------------------
 The laser and the mass spectrometer are two instruments with two clocks, started
 by two computers. The laser log knows *when it fired and where*; the ICP data
@@ -8,7 +8,7 @@ knows *what it counted*. Nothing in either file states which counts belong to
 which ablation — that correspondence is reconstructed downstream, and when it is
 reconstructed wrongly every number after it is wrong while the report stays green.
 
-icpqc does not perform that alignment: segmenting a transient signal is reduction,
+icpms-qc does not perform that alignment: segmenting a transient signal is reduction,
 and reduction belongs to the tools that already do it well (pewpew/pewlib, Ilaps,
 iolite, laserTRAM). What no tool does is *audit* the result. This module exists to
 make the audit possible — it turns the laser's own record of the run into

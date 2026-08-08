@@ -7,7 +7,7 @@ a rule pack.
 
 ## Read this first
 
-**icpqc ships typical values, not method text.** The thresholds in
+**icpms-qc ships typical values, not method text.** The thresholds in
 `configs/*.yaml` are defaults chosen to be recognisable, not transcriptions of
 any standard. Before any compliance use, verify every threshold against the
 current revision of the method your laboratory actually runs under, and record
@@ -70,7 +70,7 @@ the curve into one number.
 `cal_heteroscedasticity` goes one step further and reports the *pattern*: when
 low-end relative error is both large in absolute terms and disproportionately
 larger than the high end, the residuals are asking for a weighted fit (1/x or
-1/x²). icpqc cannot refit the curve — that lives in the instrument software —
+1/x²). icpms-qc cannot refit the curve — that lives in the instrument software —
 so this check only says so, and warns rather than fails.
 
 ⚠️ **The absolute floor matters.** A ratio on its own is not evidence: when the

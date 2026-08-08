@@ -1,4 +1,4 @@
-"""icpqc — post-run QC engine and compliance reporter for ICP-MS batch exports.
+"""icpms-qc — post-run QC engine and compliance reporter for ICP-MS batch exports.
 
 Clean-room project: built from public method texts (EPA SW-846 6020B, EPA 200.8)
 and publicly documented export capabilities. Not affiliated with any instrument

@@ -1,6 +1,6 @@
 """precision_rsd and instrument_flags — the blind spot a real batch exposed.
 
-Validating against two real MassHunter exports showed icpqc reporting nothing at
+Validating against two real MassHunter exports showed icpms-qc reporting nothing at
 all while the instrument software itself raised 1218 objections, every one of
 them about precision or calibration. Two causes: no precision check existed, and
 the templates discarded the %RSD columns before the engine ever saw them. These
@@ -8,10 +8,10 @@ tests pin both shut.
 """
 import pytest
 
-from icpqc.io import masshunter
-from icpqc.io.masshunter import parse_instrument_flags
-from icpqc.qc import checks
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.io.masshunter import parse_instrument_flags
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import Outcome
 
 BE_RSD = "9 Be CPS RSD"
 BE_CPS = "9 Be CPS"
@@ -129,7 +129,7 @@ def test_no_flag_column_reads_differently_from_no_flags(pass_csv):
 
 
 def test_flags_are_reported_but_not_decisive_by_default(pass_csv):
-    from icpqc.model import InstrumentFlag
+    from icpms_qc.model import InstrumentFlag
     batch = masshunter.parse(str(pass_csv))
     batch.flags_column_mapped = True
     batch.samples[0].instrument_flags = [

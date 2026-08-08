@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from icpqc.io import laserlog
-from icpqc.model import Batch, Sample, SampleType
-from icpqc.qc import checks
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import laserlog
+from icpms_qc.model import Batch, Sample, SampleType
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import Outcome
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from gen_synthetic_laserlog import generate as gen_log  # noqa: E402

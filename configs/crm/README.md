@@ -86,7 +86,7 @@ only then is the file loaded.
 Units are converted at check time (`ppb`/`ppm`/`ppt`, `µg/L`, `mg/L`, `ng/g`, …).
 An unrecognized unit produces a NOT-ASSESSED row with the reason — a certificate
 in mg/L read against results in ppb is the easiest way to be wrong by 1000×, so
-icpqc refuses to guess.
+icpms-qc refuses to guess.
 
 `uncertainty` is optional and **informational**. It is the source's own
 uncertainty (expanded k=2 on a certificate, usually a 1s/2s spread in a
@@ -110,7 +110,7 @@ whether the result also lands inside the certificate's uncertainty (context).
    NRC-CNRC and High-Purity certificates are all published openly — cite the URL
    in `source:` so the next reviewer can check your transcription.
 3. Add the name patterns your lab actually types into the sequence.
-4. Run `icpqc check` and confirm the report names your material.
+4. Run `icpms-qc check` and confirm the report names your material.
 
 Only certified values belong in a file here. Information about your samples,
 your clients or your batches does not — this directory is meant to be shareable,

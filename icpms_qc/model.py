@@ -1,7 +1,7 @@
 """Canonical batch model — the only thing the QC engine ever sees.
 
-Parsers (icpqc.io.*) translate vendor export layouts into these dataclasses via
-template mappings; checks (icpqc.qc.*) consume them. Nothing downstream of io/
+Parsers (icpms_qc.io.*) translate vendor export layouts into these dataclasses via
+template mappings; checks (icpms_qc.qc.*) consume them. Nothing downstream of io/
 may touch raw CSV.
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:                      # keeps the model free of io/ at runtime
-    from icpqc.io.laserlog import LaserLog
+    from icpms_qc.io.laserlog import LaserLog
 
 
 class SampleType(str, Enum):
@@ -104,7 +104,7 @@ class InstrumentFlag:
 
     The vendor already judged this run and wrote its verdict into the export. A
     tool that calls itself auditable and then discards that verdict is hiding
-    evidence — so it is parsed, carried, and reported alongside icpqc's own.
+    evidence — so it is parsed, carried, and reported alongside icpms-qc's own.
     """
     analyte: str                  # label as the instrument wrote it
     metric: str                   # e.g. "CPS RSD"

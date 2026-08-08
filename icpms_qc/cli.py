@@ -1,8 +1,8 @@
-"""icpqc command-line interface.
+"""icpms-qc command-line interface.
 
-    icpqc check <export.csv> --rules epa6020b --template masshunter_quant_wide [--out DIR]
-    icpqc inspect <export.csv> [--include-names]
-    icpqc template-from-header <export.csv> --id <name> [--accept] [--include-names]
+    icpms-qc check <export.csv> --rules epa6020b --template masshunter_quant_wide [--out DIR]
+    icpms-qc inspect <export.csv> [--include-names]
+    icpms-qc template-from-header <export.csv> --id <name> [--accept] [--include-names]
 
 Exit codes: 0 = all checks pass, 2 = QC failures present, 1 = error.
 Automation/agent friendly: the JSON sidecar is the API; stdout stays terse.
@@ -13,29 +13,29 @@ import argparse
 import sys
 from pathlib import Path
 
-from icpqc.io import masshunter
-from icpqc.qc import engine
-from icpqc.report import render
+from icpms_qc.io import masshunter
+from icpms_qc.qc import engine
+from icpms_qc.report import render
 
 
 def _cmd_check(args) -> int:
     try:
         batch = masshunter.parse(args.export_csv, template=args.template)
         if args.laser_log:
-            from icpqc.io import laserlog
+            from icpms_qc.io import laserlog
             if not laserlog.looks_like_laser_log(args.laser_log):
-                print(f"icpqc: error: {args.laser_log} does not look like a laser log "
+                print(f"icpms-qc: error: {args.laser_log} does not look like a laser log "
                       f"(no 'Timestamp'/'Laser State' columns)", file=sys.stderr)
                 return 1
             batch.laser_log = laserlog.parse(args.laser_log)
         results = engine.run(batch, rules=args.rules)
         html_path, json_path = render.write(batch, results, out_dir=args.out)
     except (OSError, ValueError) as exc:
-        print(f"icpqc: error: {exc}", file=sys.stderr)
+        print(f"icpms-qc: error: {exc}", file=sys.stderr)
         return 1
 
     verdict = engine.verdict(results)
-    print(f"icpqc {verdict}: {args.export_csv}")
+    print(f"icpms-qc {verdict}: {args.export_csv}")
     for r in results:
         line = f"  [{r.outcome.value:>13}] {r.check_id}"
         if r.reason:
@@ -50,11 +50,11 @@ def _cmd_check(args) -> int:
 
 def _cmd_inspect(args) -> int:
     """Print the layout fingerprint — exactly what a model would be shown."""
-    from icpqc.io import mapper
+    from icpms_qc.io import mapper
     try:
         fp = mapper.fingerprint(args.export_csv, include_names=args.include_names)
     except (OSError, ValueError) as exc:
-        print(f"icpqc: error: {exc}", file=sys.stderr)
+        print(f"icpms-qc: error: {exc}", file=sys.stderr)
         return 1
     print(fp.to_json())
     if not args.include_names:
@@ -65,33 +65,33 @@ def _cmd_inspect(args) -> int:
 
 def _cmd_template(args) -> int:
     """Draft a template for an unknown layout, validate it, then let a human accept."""
-    from icpqc.io import mapper
+    from icpms_qc.io import mapper
 
     try:
         fp = mapper.fingerprint(args.export_csv, include_names=args.include_names)
     except (OSError, ValueError) as exc:
-        print(f"icpqc: error: {exc}", file=sys.stderr)
+        print(f"icpms-qc: error: {exc}", file=sys.stderr)
         return 1
 
-    print(f"icpqc: fingerprinting {args.export_csv}")
+    print(f"icpms-qc: fingerprinting {args.export_csv}")
     print(f"  {fp.n_columns} columns · {fp.n_rows_scanned} rows scanned · "
           f"encoding {fp.encoding}")
     print(f"  sending layout only"
           f"{' (INCLUDING sample names — you asked)' if fp.names_included else ''}"
           f"; no measurement values leave this machine")
-    print("icpqc: asking the model for a draft template …")
+    print("icpms-qc: asking the model for a draft template …")
 
     try:
         tpl_yaml, v, _ = mapper.draft(args.export_csv, template_id=args.id,
                                       include_names=args.include_names)
     except RuntimeError as exc:
-        print(f"icpqc: error: {exc}", file=sys.stderr)
+        print(f"icpms-qc: error: {exc}", file=sys.stderr)
         return 1
 
     if args.resolve and v.ok and v.unknown_types:
         plan = mapper.plan_resolution(tpl_yaml, args.export_csv)
         if plan.empty and not plan.skipped:
-            print("icpqc: nothing to resolve — no unmapped types carry sample names")
+            print("icpms-qc: nothing to resolve — no unmapped types carry sample names")
         else:
             print("\nicpqc: some sample types stayed unmapped. Resolving them needs "
                   "the names of\n       the rows that carry them — QC and standard "
@@ -100,7 +100,7 @@ def _cmd_template(args) -> int:
             if plan.empty:
                 print("       nothing left to disclose; skipping the resolution pass")
             else:
-                print("icpqc: asking the model to resolve them …")
+                print("icpms-qc: asking the model to resolve them …")
                 tpl_yaml, v = mapper.resolve(tpl_yaml, args.export_csv, plan)
 
     print("\n─── draft template " + "─" * 52)
@@ -125,12 +125,12 @@ def _cmd_template(args) -> int:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(tpl_yaml, encoding="utf-8")
     print(f"\nwrote {dest}")
-    print(f"now run:  icpqc check {args.export_csv} --template {dest.stem.replace('.template', '')}")
+    print(f"now run:  icpms-qc check {args.export_csv} --template {dest.stem.replace('.template', '')}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="icpqc", description=__doc__)
+    parser = argparse.ArgumentParser(prog="icpms-qc", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     check = sub.add_parser("check", help="run QC checks on a batch export")

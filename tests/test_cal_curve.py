@@ -7,9 +7,9 @@ lowest standard back-calculates to half its nominal value still reports
 r > 0.999. These tests pin that down: the same batch that sails through
 cal_linearity is caught on its residuals.
 """
-from icpqc.io import masshunter
-from icpqc.qc import checks
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import Outcome
 
 BE = "9 Be Conc. [ppb]"
 LOW_STD = "Cal Std 1 ppb"

@@ -1,6 +1,6 @@
 """Two-row-header layout family (real-world MassHunter exports): synthetic fixture."""
-from icpqc.io import masshunter
-from icpqc.model import SampleType
+from icpms_qc.io import masshunter
+from icpms_qc.model import SampleType
 
 CSV_2ROW = (
     "Sample,,,,,,,56  Fe  [ He ] ,,115  In ( ISTD )  [ No Gas ] ,\n"

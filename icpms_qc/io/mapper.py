@@ -24,7 +24,7 @@ Three properties are deliberate, and none of them are negotiable:
    Nothing is written to ``configs/`` without an explicit human accept.
 
 The LLM step is optional. ``fingerprint()`` and ``validate()`` are pure Python, so
-``icpqc inspect`` works offline and the fingerprint can be handed to any model — or
+``icpms-qc inspect`` works offline and the fingerprint can be handed to any model — or
 to a person — to author the template by hand.
 """
 from __future__ import annotations
@@ -41,7 +41,7 @@ from pathlib import Path
 
 import yaml
 
-from icpqc.io import masshunter, templates
+from icpms_qc.io import masshunter, templates
 
 MAX_SCAN_ROWS = 400
 MAX_DISTINCT = 12
@@ -326,7 +326,7 @@ Template schema (all keys optional unless marked required):
 """
 
 _PROMPT = """\
-You are drafting an icpqc export-layout template for an ICP-MS batch export whose \
+You are drafting an icpms-qc export-layout template for an ICP-MS batch export whose \
 layout is unknown. You are given a layout fingerprint: header rows verbatim, and \
 per-column kind plus categorical vocabularies. Measurement values are withheld by \
 design, and non-vocabulary text is masked with {mask} — treat masked text as \
@@ -397,7 +397,7 @@ def call_model(prompt: str, timeout: int = 600) -> str:
 
     raise RuntimeError(
         "no model available: install the `claude` CLI or set ANTHROPIC_API_KEY.\n"
-        "You can still author the template by hand — run `icpqc inspect` and use "
+        "You can still author the template by hand — run `icpms-qc inspect` and use "
         "the fingerprint it prints.")
 
 
@@ -596,7 +596,7 @@ def plan_resolution(template_yaml: str, export_csv: str) -> Disclosure:
 
 
 _RESOLVE_PROMPT = """\
-You previously drafted this icpqc template. Some sample-type strings were left \
+You previously drafted this icpms-qc template. Some sample-type strings were left \
 unmapped because their canonical role could not be told apart from layout alone. \
 Here are the sample names of the rows carrying each unresolved type — these are \
 calibration standards and QC aliquots named by the lab, disclosed for this purpose \

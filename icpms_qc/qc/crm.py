@@ -2,7 +2,7 @@
 
 Why this is its own layer
 -------------------------
-Every other recovery check in icpqc divides by ``Sample.level`` — one expected
+Every other recovery check in icpms-qc divides by ``Sample.level`` — one expected
 concentration that applies to every analyte, which is exactly right for a spike
 made from one multi-element standard. A certified reference material is not that
 shape: NIST SRM 1640a certifies ~30 elements at ~30 *different* values, each with

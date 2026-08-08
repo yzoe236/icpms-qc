@@ -1,6 +1,4 @@
-# icpqc
-
-*(working name — check PyPI/GitHub availability before first release)*
+# icpms-qc — the QC check machine for ICP-MS batches
 
 **Post-run QC review for ICP-MS batch exports.**
 
@@ -10,7 +8,7 @@ first. **Instruments produce numbers. They do not produce assurance.** Somebody 
 at the run and say "I've reviewed this, it can be reported" — and in most labs that
 somebody is one experienced person, one batch at a time.
 
-icpqc automates the reviewable part of that: point it at a batch export and get every QC
+icpms-qc automates the reviewable part of that: point it at a batch export and get every QC
 criterion evaluated, with the numbers behind each verdict, in a report you can hand to
 someone else — driven by versioned, editable rule packs (EPA 6020B-style, EPA 200.8-style,
 or your lab's own SOP).
@@ -34,9 +32,9 @@ templates for EPA 200.8, 6020 and ISO 17294 and evaluates ISTD recovery, calibra
 linearity, %RSD and blank levels during acquisition. **A regulated lab running a validated
 LIMS** (LabWare and its peers) already has batch QC enforcement, control charts, audit
 trails and scheduled compliance reporting — and changing tools there means re-validation
-and an audit. If that's you, icpqc is not worth your trouble, and you should not switch.
+and an audit. If that's you, icpms-qc is not worth your trouble, and you should not switch.
 
-**icpqc is for the labs in between:** a shared instrument facility, a research group, a
+**icpms-qc is for the labs in between:** a shared instrument facility, a research group, a
 lab that owns an ICP-MS but no LIMS and no dedicated QC infrastructure — where the review
 is real work done by a person, and the record of it is a spreadsheet on someone's desktop.
 
@@ -58,7 +56,7 @@ workflow. And it does not certify anything — you remain the person who signs o
 
 ```bash
 pip install .                      # from a clone; PyPI release pending name check
-icpqc check my_batch_export.csv --rules epa6020b --template masshunter_quant_wide
+icpms-qc check my_batch_export.csv --rules epa6020b --template masshunter_quant_wide
 # → out/qc_report.html  (human)  +  out/qc_report.json  (machines/agents)
 # exit code: 0 = all pass, 2 = QC failures, 1 = error  (CI/automation friendly)
 ```
@@ -72,9 +70,9 @@ Exports differ by vendor, software version, and report template, so the honest a
 to "will it read my file?" used to be "after you write a YAML template." Now:
 
 ```bash
-icpqc inspect my_export.csv                            # what does my layout look like?
-icpqc template-from-header my_export.csv --id my_lab   # draft a template for it
-icpqc template-from-header my_export.csv --id my_lab --accept
+icpms-qc inspect my_export.csv                            # what does my layout look like?
+icpms-qc template-from-header my_export.csv --id my_lab   # draft a template for it
+icpms-qc template-from-header my_export.csv --id my_lab --accept
 ```
 
 `template-from-header` extracts a **layout fingerprint** — column headers, per-column
@@ -86,7 +84,7 @@ Three things this deliberately does *not* do:
 
 - **It never sends measurements.** The fingerprint carries layout, not values; free
   text outside lab vocabulary is masked, so client sample names stay on your machine.
-  Run `icpqc inspect` to see exactly what would be sent. (`--include-names` opts out,
+  Run `icpms-qc inspect` to see exactly what would be sent. (`--include-names` opts out,
   and tells you it did.)
 - **The model never judges QC.** It authors a template, once. After you accept it, the
   layout is a plain YAML file and every future run is deterministic — the same export
@@ -95,7 +93,7 @@ Three things this deliberately does *not* do:
   because a loud `NOT_EVALUATED` is worth more than a confident wrong answer.
 
 Needs the [`claude` CLI](https://claude.com/claude-code) or `ANTHROPIC_API_KEY`. Without
-either, `icpqc inspect` still works — hand the fingerprint to any model, or write the
+either, `icpms-qc inspect` still works — hand the fingerprint to any model, or write the
 template yourself.
 
 ## Quick start (continued)
@@ -104,7 +102,7 @@ No real data at hand? Generate a synthetic demo batch:
 
 ```bash
 python tools/gen_synthetic_data.py demo_batch.csv
-icpqc check demo_batch.csv --rules epa6020b
+icpms-qc check demo_batch.csv --rules epa6020b
 python tools/gen_synthetic_data.py bad_batch.csv --violations   # see a failing report
 ```
 
@@ -123,12 +121,12 @@ silence is how QC reports lie.
 standard perfectly and still be unusable because the signal would not sit still, and the
 accuracy checks cannot see that. `precision_rsd` reads the %RSD your export already
 carries — gated on signal level, because the RSD of a blank is counting noise rather than
-a finding. Validating against two real batches found icpqc silently reporting nothing
+a finding. Validating against two real batches found icpms-qc silently reporting nothing
 while the instrument software itself had raised 1218 objections, all of them precision or
 calibration; that is the hole this closes.
 
 **The instrument's own verdict is carried, not discarded.** MassHunter writes its QC
-objections into the export. `instrument_flags` parses and reports them alongside icpqc's
+objections into the export. `instrument_flags` parses and reports them alongside icpms-qc's
 own conclusions — they are the vendor's thresholds, so they are reported rather than
 decisive (`on_flag: fail` makes them binding), and where the two disagree, that
 disagreement is exactly what a reviewer needs to see.
@@ -142,7 +140,7 @@ the same report.
 ### Laser ablation: auditing the two clocks
 
 ```bash
-icpqc check reduced_results.csv --laser-log LaserLog.csv
+icpms-qc check reduced_results.csv --laser-log LaserLog.csv
 ```
 
 The laser and the mass spectrometer are two instruments with two clocks, started by
@@ -150,10 +148,10 @@ two computers. Which counts belong to which ablation is always a *reconstruction
 and when it slips (a lost trigger, a dropped sequence, an off-by-one), every
 concentration after the slip is attributed to the wrong spot and nothing complains.
 
-icpqc does not do the alignment — that is reduction, and
+icpms-qc does not do the alignment — that is reduction, and
 [pewpew](https://github.com/djdt/pewpew), [Ilaps](https://github.com/nikadilli/Ilaps-v2),
 iolite and [laserTRAM](https://github.com/jlubbersgeo/laserTRAM-DB) already do it.
-icpqc **audits** it: patterns fired vs rows reported, sample names position by
+icpms-qc **audits** it: patterns fired vs rows reported, sample names position by
 position, ablation durations against the run. That comparison needs no raw signal
 at all, and today nothing else performs it.
 
@@ -212,7 +210,7 @@ names, real column layout) + the software version that produced it.
 
 [**ICPHuntR**](https://github.com/loeRl/ICPHuntR) (R, Lorenz Gfeller) reshapes MassHunter
 export tables into tidy data frames and ships a table of reference-material values. It
-stops where icpqc starts — it hands you a data frame to write your own analysis against,
+stops where icpms-qc starts — it hands you a data frame to write your own analysis against,
 rather than a verdict and a report — but it hit the same export-side problems first, and
 three things here are better for having read it: triple-quad `mass -> mass` labels,
 collision-cell mode as a first-class field, and detection limits estimated from the

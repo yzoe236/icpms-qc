@@ -1,4 +1,4 @@
-# Using icpqc
+# Using icpms-qc
 
 A walkthrough from "I have a CSV" to "I have a report someone else can read".
 
@@ -10,15 +10,15 @@ Everything below has been run as written. Exit codes: **0** = all checks passed,
 ## 1. Install
 
 ```bash
-git clone <repo> && cd icpqc
+git clone <repo> && cd icpms-qc
 pip install .
 ```
 
 Python ≥ 3.10. The only runtime dependency is `pyyaml`. For the test suite:
 `pip install -e ".[dev]" && pytest`.
 
-Installing puts an `icpqc` command on your PATH. If you'd rather not install,
-every example below also works as `python -m icpqc.cli …` from the repo root.
+Installing puts an `icpms-qc` command on your PATH. If you'd rather not install,
+every example below also works as `python -m icpms_qc.cli …` from the repo root.
 
 ---
 
@@ -29,11 +29,11 @@ anything of yours. Nothing here touches an instrument.
 
 ```bash
 python tools/gen_synthetic_data.py demo_batch.csv
-icpqc check demo_batch.csv --rules epa6020b
+icpms-qc check demo_batch.csv --rules epa6020b
 ```
 
 ```
-icpqc PASS: demo_batch.csv
+icpms-qc PASS: demo_batch.csv
   [         PASS] cal_linearity
   [         PASS] cal_back_calc
   ...
@@ -46,7 +46,7 @@ Open `out/qc_report.html`. Then see a failing run:
 
 ```bash
 python tools/gen_synthetic_data.py bad_batch.csv --violations
-icpqc check bad_batch.csv --rules epa6020b --out out_fail
+icpms-qc check bad_batch.csv --rules epa6020b --out out_fail
 ```
 
 Three failures are injected on purpose (a CCV at ~85%, internal-standard drift to
@@ -60,14 +60,14 @@ confirm the tool actually catches things.
 ### 3a. Try a shipped template first
 
 ```bash
-icpqc check my_batch.csv --rules epa6020b --template masshunter_quant_wide
+icpms-qc check my_batch.csv --rules epa6020b --template masshunter_quant_wide
 ```
 
 If the layout matches, you're done. If it doesn't, you'll get a loud error rather
 than a wrong answer:
 
 ```
-icpqc: error: no analyte columns matched template 'masshunter_quant_wide' —
+icpms-qc: error: no analyte columns matched template 'masshunter_quant_wide' —
 wrong template for this export?
 ```
 
@@ -82,7 +82,7 @@ Shipped templates:
 ### 3b. Look at what you actually have
 
 ```bash
-icpqc inspect my_batch.csv
+icpms-qc inspect my_batch.csv
 ```
 
 Prints a **layout fingerprint** — column headers, detected encoding, per-column
@@ -97,7 +97,7 @@ found against the pattern in the template you tried.
 ### 3c. Let a model draft the template
 
 ```bash
-icpqc template-from-header my_batch.csv --id my_lab
+icpms-qc template-from-header my_batch.csv --id my_lab
 ```
 
 It sends the *fingerprint* (never measurements), asks a model for a template,
@@ -117,8 +117,8 @@ understood — how many samples, which analytes, which sample types fell through
 template is a claim about your data.
 
 ```bash
-icpqc template-from-header my_batch.csv --id my_lab --accept
-icpqc check my_batch.csv --template my_lab --rules epa6020b
+icpms-qc template-from-header my_batch.csv --id my_lab --accept
+icpms-qc check my_batch.csv --template my_lab --rules epa6020b
 ```
 
 Once accepted the template is a plain YAML file and every future run is
@@ -127,7 +127,7 @@ years. Add `--resolve` if sample types stayed unmapped; it shows you exactly
 which sample names it would disclose before sending anything.
 
 Needs the [`claude` CLI](https://claude.com/claude-code) or `ANTHROPIC_API_KEY`.
-Without either, `icpqc inspect` still works — hand the fingerprint to any model,
+Without either, `icpms-qc inspect` still works — hand the fingerprint to any model,
 or write the template by hand.
 
 ---
@@ -144,10 +144,10 @@ Every check reports one of four outcomes:
 | **NOT_EVALUATED** | **could not run, and says why** — a missing CCV is not a pass |
 
 That last one matters most. A check that quietly skips is how QC reports lie, so
-icpqc always states what it could not assess. `serial_dilution - no serial
+icpms-qc always states what it could not assess. `serial_dilution - no serial
 dilution samples in batch` means exactly that: nobody checked, and you now know.
 
-The HTML report carries, in order: parser warnings, the analytes as icpqc
+The HTML report carries, in order: parser warnings, the analytes as icpms-qc
 understood them (a blank element column means a header it could not read — every
 element-keyed check has been skipping it), the sequence, then one section per
 check with the numbers behind the verdict.
@@ -163,7 +163,7 @@ The shipped packs are **typical defaults, not method text**. Copy one and edit:
 
 ```bash
 cp configs/epa6020b.yaml configs/mylab.yaml
-icpqc check my_batch.csv --rules configs/mylab.yaml
+icpms-qc check my_batch.csv --rules configs/mylab.yaml
 ```
 
 A pack entry looks like:
@@ -226,7 +226,7 @@ ones you measure and rename to `.yaml`. See
 ## 7. Automation
 
 ```bash
-icpqc check batch.csv --rules mylab --out reports/$(date +%F)
+icpms-qc check batch.csv --rules mylab --out reports/$(date +%F)
 echo $?     # 0 = pass, 2 = QC failures, 1 = error
 ```
 
@@ -246,15 +246,15 @@ d["batch"]["warnings"]                          # anything the parser could not 
 
 ## 8. Laser ablation runs
 
-If you have a laser log, pass it and icpqc will audit whether the results and the
+If you have a laser log, pass it and icpms-qc will audit whether the results and the
 laser's own record describe the same run — patterns fired vs rows reported, names
 position by position, ablation durations:
 
 ```bash
-icpqc check reduced_results.csv --laser-log LaserLog.csv
+icpms-qc check reduced_results.csv --laser-log LaserLog.csv
 ```
 
-icpqc does not perform the alignment (that's reduction, and pewpew/Ilaps/iolite/
+icpms-qc does not perform the alignment (that's reduction, and pewpew/Ilaps/iolite/
 laserTRAM already do it). It only checks whether the answer survives comparison.
 Without `--laser-log` the check reports `NOT_EVALUATED`, which is the normal state
 for solution-mode work.
@@ -263,15 +263,15 @@ for solution-mode work.
 
 ## Getting stuck
 
-- **"no analyte columns matched"** → wrong template. Run `icpqc inspect` and
+- **"no analyte columns matched"** → wrong template. Run `icpms-qc inspect` and
   compare the real column names against the template's `analyte_conc_pattern`.
 - **`unrecognized sample type 'X' -> OTHER`** → add `X` to the template's
   `sample_type_vocab`. Checks needing that type will say `NOT_EVALUATED` until you do.
 - **Everything `NOT_EVALUATED`** → the batch genuinely lacks those QC samples, or
   the sample-type vocabulary isn't mapped. The reasons tell you which.
 - **Mojibake in element names (`µg/L`)** → the export is cp1252, not UTF-8. Set
-  `encoding: cp1252` in your template; icpqc falls back automatically and warns.
+  `encoding: cp1252` in your template; icpms-qc falls back automatically and warns.
 
-Found a layout icpqc can't read? A **redacted** export (fake sample names, real
+Found a layout icpms-qc can't read? A **redacted** export (fake sample names, real
 column structure) plus the software version is the single most useful thing you
 can contribute.

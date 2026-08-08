@@ -40,7 +40,7 @@ default_value_type: reference
 note: >-
   !! BIR-1G (glass) is NOT BIR-1 (powder). The G is required.
   Depleted basalt: many trace elements sit near or below detection, so
-  expect non-detects — icpqc reports those on their upper bound.
+  expect non-detects — icpms-qc reports those on their upper bound.
 
 source: "FILL — e.g. GeoReM http://georem.mpch-mainz.gwdg.de/ , or the USGS/NIST certificate PDF"
 provenance:

@@ -11,7 +11,7 @@
 id: example_synthetic_water
 name: EXAMPLE synthetic water CRM (fabricated — demo only)
 matrix: water
-source: "fabricated for icpqc's synthetic demo batch; no certificate exists"
+source: "fabricated for icpms-qc's synthetic demo batch; no certificate exists"
 
 # Unit of every value under `certified:`. Converted to the result's unit at
 # check time — an unconvertible pair is reported, never guessed.

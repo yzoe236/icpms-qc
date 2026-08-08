@@ -9,7 +9,7 @@ import csv
 
 import pytest
 
-from icpqc.io import mapper
+from icpms_qc.io import mapper
 
 VENDOR_B_HEADER = [
     "No.", "Sample Id", "Sample Type", "Std Conc (ppb)",

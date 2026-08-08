@@ -5,9 +5,9 @@ rule pack declares. A reporting limit carried over from a better day makes every
 blank threshold and every RPD cutoff downstream of it optimistic, and no other
 check in the catalog would notice.
 """
-from icpqc.io import masshunter
-from icpqc.qc import checks
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import Outcome
 
 BE = "9 Be Conc. [ppb]"
 

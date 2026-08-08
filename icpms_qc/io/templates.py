@@ -22,7 +22,7 @@ from pathlib import Path
 
 import yaml
 
-from icpqc.model import SampleType
+from icpms_qc.model import SampleType
 
 _REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))            # import icpqc without installing
+sys.path.insert(0, str(REPO))            # import icpms_qc without installing
 sys.path.insert(0, str(REPO / "tools"))  # import the generator as a module
 
 from gen_synthetic_data import generate  # noqa: E402

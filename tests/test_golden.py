@@ -1,8 +1,8 @@
 """Golden outcomes: the all-passing batch is all green; the violations batch
 fails exactly the three injected checks (SPEC §7)."""
-from icpqc.io import masshunter
-from icpqc.qc import engine
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.qc import engine
+from icpms_qc.qc.checks import Outcome
 
 ALL_CHECKS = {
     "cal_linearity", "cal_back_calc", "cal_heteroscedasticity", "cal_low_std",

@@ -8,10 +8,10 @@ import re
 
 import pytest
 
-from icpqc.io import masshunter
-from icpqc.io.masshunter import _analyte_from_label as parse
-from icpqc.qc import checks
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.io.masshunter import _analyte_from_label as parse
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import Outcome
 
 
 @pytest.mark.parametrize("label,mass,shift,element,mode", [

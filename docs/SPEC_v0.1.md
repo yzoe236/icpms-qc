@@ -1,4 +1,4 @@
-# icpqc — Specification v0.1 (draft, 2026-07-19)
+# icpms-qc — Specification v0.1 (draft, 2026-07-19)
 
 **Provenance note (clean-room):** this spec is drafted solely from public sources — the
 publicly available texts of EPA SW-846 Method 6020B and EPA Method 200.8, Agilent's public
@@ -28,13 +28,13 @@ export CSV ──► io/ (template-driven parser) ──► canonical BatchModel
                                                       │
                                              report/ (HTML + JSON)
                                                       │
-                                                  cli (icpqc check)
+                                                  cli (icpms-qc check)
 ```
 
 - `io/` — one parser per *layout family*, selected by a **template** (YAML): column-pattern → field mapping, sample-type vocabulary mapping, analyte-header regex. Rationale: MassHunter export layouts vary by version and report template; mappings are data, not code.
 - `qc/` — small, pure check functions over the canonical model; a rule pack parameterizes thresholds and which checks are active. Checks never read CSV directly.
 - `report/` — renders `CheckResult[]` + batch metadata. JSON schema is a stable public contract (semver'd).
-- `cli` — `icpqc check <export.csv> --rules <pack> --template <tpl> [--out DIR]`; exit code 0 = all pass, 2 = QC failures (CI/automation-friendly).
+- `cli` — `icpms-qc check <export.csv> --rules <pack> --template <tpl> [--out DIR]`; exit code 0 = all pass, 2 = QC failures (CI/automation-friendly).
 
 ## 3. Canonical batch model
 
@@ -127,7 +127,7 @@ Two checks are worth calling out as different in kind:
 
 ### 4.1 Second input: the laser log (LA-ICP-MS)
 
-`icpqc check results.csv --laser-log LaserLog.csv`
+`icpms-qc check results.csv --laser-log LaserLog.csv`
 
 The laser and the mass spectrometer are two instruments with two clocks, started by
 two computers. The laser log knows *when it fired and where*; the ICP data knows
@@ -135,10 +135,10 @@ two computers. The laser log knows *when it fired and where*; the ICP data knows
 ablation — that correspondence is reconstructed downstream, and when it is
 reconstructed wrongly every number after it is wrong while the report stays green.
 
-**icpqc does not perform the alignment.** Segmenting a transient signal is
+**icpms-qc does not perform the alignment.** Segmenting a transient signal is
 reduction (SPEC §1 non-goals) and the tools that do it — pewpew/pewlib, Ilaps,
 iolite, laserTRAM — do it well. What none of them does is *audit* the outcome.
-`icpqc.io.laserlog` parses the laser's own record into `Batch.laser_log` so
+`icpms_qc.io.laserlog` parses the laser's own record into `Batch.laser_log` so
 `laser_log_alignment` can compare it against the reduced results.
 
 **Granularity is the crux and must not be assumed.** One log *sequence* is one

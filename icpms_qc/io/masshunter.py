@@ -1,6 +1,6 @@
 """Agilent MassHunter quantitative batch export (CSV) → Batch.
 
-Template-driven (see icpqc.io.templates): nothing lab-specific is hardcoded.
+Template-driven (see icpms_qc.io.templates): nothing lab-specific is hardcoded.
 Supports both the single-header reference layout and the real-world two-row
 header layout (analyte labels spanning column pairs above measure sub-headers).
 Unrecognized sample-type strings map to SampleType.OTHER and append a
@@ -11,8 +11,8 @@ from __future__ import annotations
 import csv
 import re
 
-from icpqc.io import templates
-from icpqc.model import Analyte, Batch, InstrumentFlag, Result, Sample, SampleType
+from icpms_qc.io import templates
+from icpms_qc.model import Analyte, Batch, InstrumentFlag, Result, Sample, SampleType
 
 # Analyte labels, every shape a MassHunter export writes them in:
 #   "9 Be"                 single quad, no cell gas

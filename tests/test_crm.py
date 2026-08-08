@@ -6,9 +6,9 @@ The values come from the certificate library in configs/crm/.
 """
 import pytest
 
-from icpqc.io import masshunter
-from icpqc.qc import checks, crm
-from icpqc.qc.checks import Outcome
+from icpms_qc.io import masshunter
+from icpms_qc.qc import checks, crm
+from icpms_qc.qc.checks import Outcome
 
 CD = "111 Cd Conc. [ppb]"
 WINDOW = {"window_pct": [80, 120]}

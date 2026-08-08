@@ -16,8 +16,8 @@ import statistics
 from dataclasses import dataclass, field
 from enum import Enum
 
-from icpqc.model import ANALYSIS_TYPES, Batch, SampleType
-from icpqc.qc import crm
+from icpms_qc.model import ANALYSIS_TYPES, Batch, SampleType
+from icpms_qc.qc import crm
 
 
 class Outcome(str, Enum):
@@ -834,7 +834,7 @@ def laser_log_alignment(batch: Batch, params: dict) -> CheckResult:
     off-by-one — every concentration downstream is attributed to the wrong spot
     and nothing complains. This check is the complaint.
 
-    icpqc does not do the alignment (that is reduction, and pewpew/Ilaps/iolite/
+    icpms-qc does not do the alignment (that is reduction, and pewpew/Ilaps/iolite/
     laserTRAM already do it). It only asks whether the answer survives comparison
     with the laser log.
 

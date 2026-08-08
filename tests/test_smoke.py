@@ -8,7 +8,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def test_model_basics():
-    from icpqc.model import Batch, SampleType
+    from icpms_qc.model import Batch, SampleType
 
     b = Batch(source_path="x", template_id="masshunter_quant_wide",
               instrument_family="agilent-masshunter")

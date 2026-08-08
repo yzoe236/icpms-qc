@@ -17,9 +17,9 @@ from pathlib import Path
 
 import yaml
 
-from icpqc.model import Batch
-from icpqc.qc import checks
-from icpqc.qc.checks import CheckResult, Outcome
+from icpms_qc.model import Batch
+from icpms_qc.qc import checks
+from icpms_qc.qc.checks import CheckResult, Outcome
 
 _REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
 

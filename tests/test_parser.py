@@ -1,6 +1,6 @@
 """Parser: reference layout → canonical model, faithfully and loudly."""
-from icpqc.io import masshunter
-from icpqc.model import SampleType
+from icpms_qc.io import masshunter
+from icpms_qc.model import SampleType
 
 
 def test_parse_reference_layout(pass_csv):
