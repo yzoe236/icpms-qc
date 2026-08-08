@@ -49,6 +49,14 @@ def _batch_summary(batch: Batch) -> dict:
         "sample_type_counts": counts,
         "analytes": [a.label for a in batch.analytes],
         "istds": [a.label for a in batch.istds],
+        # Additive to the 0.1 contract: `analytes` keeps its meaning (labels), and
+        # the parsed identity of each is exposed alongside it. mass_shift is set
+        # only on triple-quad MS/MS acquisitions.
+        "analyte_detail": [
+            {"label": a.label, "element": a.element, "mass": a.mass,
+             "mass_shift": a.mass_shift, "mode": a.mode}
+            for a in batch.analytes
+        ],
         "warnings": batch.warnings,
     }
 
@@ -162,6 +170,23 @@ def to_html(batch: Batch, results: list[CheckResult]) -> str:
     if batch.warnings:
         items = "".join(f"<li>{_esc(w)}</li>" for w in batch.warnings)
         parts.append(f"<div class='warnbox'><b>Parser warnings</b><ul>{items}</ul></div>")
+
+    # Analytes as icpqc understood them. A reviewer's fastest way to catch a
+    # mis-read header: an element column that came back blank here was not
+    # recognized, and every element-keyed check has been skipping it.
+    parts.append("<h2>Analytes</h2>")
+    a_rows = []
+    for a in batch.analytes + batch.istds:
+        istd = a in batch.istds
+        mz = "&ndash;" if a.mass is None else (
+            f"{a.mass} &rarr; {a.mass_shift}" if a.mass_shift is not None else str(a.mass))
+        a_rows.append(
+            f"<tr><td>{_esc(a.label)}</td><td>{_esc(a.element or '—')}</td>"
+            f"<td>{mz}</td><td>{_esc(a.mode or '—')}</td>"
+            f"<td>{'ISTD' if istd else 'analyte'}</td></tr>")
+    parts.append("<div class='tablewrap'><table><thead><tr><th>label</th>"
+                 "<th>element</th><th>m/z</th><th>cell mode</th><th>role</th>"
+                 "</tr></thead><tbody>" + "".join(a_rows) + "</tbody></table></div>")
 
     parts.append("<h2>Sequence</h2>")
     seq_rows = []

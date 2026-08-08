@@ -12,15 +12,29 @@ shared:
     default: 0.1
 checks:
   cal_linearity:   { enabled: true, params: { min_r: 0.998 },                             verify: "6020B ICAL acceptance criteria" }
+  # r alone passes a curve whose bottom reads 50% low — see docs/SOURCE_BASIS.md.
+  # These two judge the curve on its residuals instead.
+  cal_back_calc:   { enabled: true, params: { window_pct: [90, 110], low_window_pct: [70, 130], min_levels: 3 }, verify: "6020B ICAL verification — each standard back-calculates; CONFIRM window vs current text" }
+  cal_heteroscedasticity: { enabled: true, params: { max_ratio: 3.0, min_low_err_pct: 10.0, min_levels: 4, on_exceed: warn }, verify: "Eurachem/ICH Q2(R2) — weighted regression when variance scales with concentration (diagnostic, not a 6020B criterion)" }
   cal_low_std:     { enabled: true, params: { window_pct: [70, 130] },                    verify: "6020B low-level standard check" }
   icv_recovery:    { enabled: true, params: { window_pct: [90, 110] },                    verify: "6020B initial calibration verification" }
   ccv_recovery:    { enabled: true, params: { window_pct: [90, 110] },                    verify: "6020B continuing calibration verification" }
   ccv_frequency:   { enabled: true, params: { every_n: 10, end_of_run: true },            verify: "6020B QC frequency requirements" }
   icb_ccb_blank:   { enabled: true, params: { limit: "LOQ" },                             verify: "6020B calibration blank acceptance" }
   method_blank:    { enabled: true, params: { limit: "LOQ" },                             verify: "6020B method blank acceptance" }
+  # Audits the LOQ above against this run's own blank scatter (3σ/10σ). min_n is
+  # the bare minimum for a standard deviation, NOT a defensible MDL study — the
+  # 40 CFR 136 B procedure wants 7+ replicates. on_exceed: fail to enforce.
+  blank_derived_lod: { enabled: true, params: { blank_types: [ICB, CCB], k_lod: 3, k_loq: 10, min_n: 3, on_exceed: warn }, verify: "40 CFR 136 App. B / lab MDL-LOQ procedure" }
   istd_recovery:   { enabled: true, params: { window_pct: [70, 130], reference: "ical" }, verify: "6020B internal standards — CONFIRM window vs current text (200.8 uses a different one)" }
   lcs_recovery:    { enabled: true, params: { window_pct: [80, 120] },                    verify: "6020B LCS acceptance (or lab control limits)" }
+  # Certified reference materials, per certified element. Values come from
+  # configs/crm/*.yaml, matched to samples by name — see configs/crm/README.md.
+  crm_recovery:    { enabled: true, params: { library: crm, window_pct: [80, 120] },      verify: "certificate of analysis + lab control limits for CRMs" }
   dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "6020B duplicate criteria" }
   ms_msd:          { enabled: true, params: { window_pct: [75, 125], max_rpd_pct: 20 },   verify: "6020B matrix spike criteria" }
   serial_dilution: { enabled: true, params: { factor: 5, agreement_pct: 10, min_conc_x_loq: 50 }, verify: "6020B serial dilution test" }
+  # Audits the laser-vs-ICP correspondence when a laser log is supplied
+  # (--laser-log). NOT_EVALUATED without one, which is the solution-mode norm.
+  laser_log_alignment: { enabled: true, params: { granularity: auto, require_name_match: true, max_duration_dev_pct: 25 }, verify: "LA-ICP-MS: laser log vs reduced results — sequence/ablation granularity is workflow-specific" }
   seq_structure:   { enabled: true, params: { require: [ICV, ICB, MB, LCS] },             verify: "lab SOP / method QC section" }

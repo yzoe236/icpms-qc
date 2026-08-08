@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# !! SYNTHETIC EXAMPLE — THESE ARE NOT CERTIFIED VALUES !!
+#
+# Every number below is fabricated to match tools/gen_synthetic_data.py so the
+# demo batch and the test suite exercise crm_recovery without shipping anyone's
+# data. Never use this file for compliance work. To make a real one, copy it and
+# transcribe the values from the certificate of analysis that came with your
+# material — NIST SRM, ERM/BCR, NRC-CNRC and High-Purity certificates are all
+# published openly, and the certificate is the only authority for these numbers.
+# ─────────────────────────────────────────────────────────────────────────────
+id: example_synthetic_water
+name: EXAMPLE synthetic water CRM (fabricated — demo only)
+matrix: water
+source: "fabricated for icpqc's synthetic demo batch; no certificate exists"
+
+# Unit of every value under `certified:`. Converted to the result's unit at
+# check time — an unconvertible pair is reported, never guessed.
+unit: ppb
+
+# How this material is recognized in an export. Sample names are the only handle
+# a batch gives you, since labs type a CRM as LCS, QC or Sample interchangeably.
+# Python regex, searched (not anchored) against the sample name.
+match:
+  name_patterns:
+    - '(?i)\bCRM-EXAMPLE-1\b'
+
+# element symbol -> certified value (+ the certificate's stated uncertainty,
+# usually expanded, k=2). `uncertainty` is optional and informational: it
+# describes the material, not your acceptance window. The pass/fail window comes
+# from the rule pack, because it is a QC policy decision.
+certified:
+  Be: { value: 20.0, uncertainty: 0.5 }
+  Cr: { value: 40.0, uncertainty: 1.0 }
+  Ni: { value: 30.0, uncertainty: 0.8 }
+  Cu: { value: 60.0, uncertainty: 1.5 }
+  Zn: { value: 80.0, uncertainty: 2.0 }
+  As: { value: 15.0, uncertainty: 0.4 }
+  Cd: { value: 10.0, uncertainty: 0.3 }
+  Pb: { value: 25.0, uncertainty: 0.7 }

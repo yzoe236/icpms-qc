@@ -14,7 +14,37 @@ import re
 from icpqc.io import templates
 from icpqc.model import Analyte, Batch, Result, Sample, SampleType
 
-_LABEL_RE = re.compile(r"^(?P<mass>\d+)\s+\[?(?P<element>[A-Za-z]{1,2})\]?")
+# Analyte labels, every shape a MassHunter export writes them in:
+#   "9 Be"                 single quad, no cell gas
+#   "75 As [He]"           single quad, collision mode
+#   "56  Fe  [ No Gas ]"   padded — MassHunter aligns these columns
+#   "78 -> 78 Se [He]"     triple quad (8800/8900) MS/MS, on-mass
+#   "31 -> 47 P [O2]"      triple quad, mass-shift onto a reaction product
+# Without the mass-shift branch a QQQ export parses to mass=None/element=None
+# and every check that groups by element goes quietly blind.
+_LABEL_RE = re.compile(
+    r"""^\s*(?P<mass>\d+)\s*                    # Q1 mass
+        (?:->\s*(?P<mass_shift>\d+)\s*)?        # Q2 mass, MS/MS only
+        \[?\s*(?P<element>[A-Z][a-z]?)(?![a-z])\s*\]?   # element symbol, whole word
+        (?:\s*\[\s*(?P<mode>[^\]]*?)\s*\])?     # cell/reaction mode
+    """,
+    re.VERBOSE,
+)
+
+_WS = re.compile(r"\s+")
+
+#: exact strings an export uses for "measured, not detected" (no limit quoted)
+_NON_DETECT = {"nd", "n.d.", "n.d", "<dl", "<mdl", "<loq", "<lod"}
+
+#: Real element symbols, so a header that merely *looks* like "<mass> <Xx>"
+#: cannot invent an element (see _analyte_from_label).
+ELEMENT_SYMBOLS = frozenset("""
+H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn
+Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La
+Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po
+At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg
+Cn Nh Fl Mc Lv Ts Og
+""".split())
 
 #: sample types whose expected conc may be recovered from the sample name
 _NAME_LEVEL_TYPES = {SampleType.CAL_STD, SampleType.ICV, SampleType.CCV,
@@ -33,12 +63,41 @@ def _num(raw: str | None) -> float | None:
         return None
 
 
+def _parse_conc(raw: str | None) -> tuple[float | None, bool, float | None]:
+    """Split a reported concentration into (value, below_dl, detection_limit).
+
+    MassHunter writes a non-detect as "<0.05", not as a number. Feeding that to
+    float() raises, so the naive parser drops it — and a blank that was cleanly
+    below detection becomes indistinguishable from a blank nobody measured. The
+    first reports PASS, the second must not.
+    """
+    if raw is None:
+        return None, False, None
+    s = raw.strip()
+    if not s or s in {"-", "N/A", "n/a", "NA"}:
+        return None, False, None
+    if s.lower() in _NON_DETECT:
+        return None, True, None                 # censored, no limit quoted
+    if s.startswith("<"):
+        return None, True, _num(s[1:])          # censored at a stated limit
+    return _num(s), False, None
+
+
 def _analyte_from_label(label: str) -> Analyte:
     m = _LABEL_RE.match(label)
+    if not m:
+        return Analyte(label=label)
+    sym = m.group("element")
+    shift, mode = m.group("mass_shift"), m.group("mode")
     return Analyte(
         label=label,
-        mass=int(m.group("mass")) if m else None,
-        element=m.group("element") if m else None,
+        mass=int(m.group("mass")),
+        # Belt and braces against a header that merely looks elemental: the
+        # regex's (?![a-z]) rejects a truncated word ("220 Bkg" -> not Bk), and
+        # the symbol set rejects a well-formed non-element ("220 Xx").
+        element=sym if sym in ELEMENT_SYMBOLS else None,
+        mass_shift=int(shift) if shift else None,
+        mode=_WS.sub(" ", mode).strip() if mode else None,
     )
 
 
@@ -157,14 +216,17 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
                 break
 
         for label in analyte_labels:
-            conc = unit = None
+            conc = unit = dl = None
+            below_dl = False
             if label in conc_cols:
                 col, unit = conc_cols[label]
-                conc = _num(row.get(col))
+                conc, below_dl, dl = _parse_conc(row.get(col))
             sample.results[label] = Result(
                 conc=conc,
                 unit=unit or "ppb",
                 intensity=_num(row.get(cps_cols[label])) if label in cps_cols else None,
+                below_dl=below_dl,
+                dl=dl,
             )
         for label, col in istd_cols.items():
             v = _num(row.get(col))

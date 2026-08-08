@@ -21,6 +21,13 @@ from icpqc.report import render
 def _cmd_check(args) -> int:
     try:
         batch = masshunter.parse(args.export_csv, template=args.template)
+        if args.laser_log:
+            from icpqc.io import laserlog
+            if not laserlog.looks_like_laser_log(args.laser_log):
+                print(f"icpqc: error: {args.laser_log} does not look like a laser log "
+                      f"(no 'Timestamp'/'Laser State' columns)", file=sys.stderr)
+                return 1
+            batch.laser_log = laserlog.parse(args.laser_log)
         results = engine.run(batch, rules=args.rules)
         html_path, json_path = render.write(batch, results, out_dir=args.out)
     except (OSError, ValueError) as exc:
@@ -132,6 +139,10 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--template", default="masshunter_quant_wide",
                        help="export-layout template name or path to YAML")
     check.add_argument("--out", default="out", help="output directory for reports")
+    check.add_argument("--laser-log", dest="laser_log",
+                       help="laser ablation log CSV (iolite/NWL style) — enables "
+                            "laser_log_alignment, which audits whether the results "
+                            "and the laser's own record describe the same run")
 
     insp = sub.add_parser("inspect", help="print the layout fingerprint of an export")
     insp.add_argument("export_csv")

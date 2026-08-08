@@ -11,10 +11,13 @@ Contract for every check:
 """
 from __future__ import annotations
 
+import re
+import statistics
 from dataclasses import dataclass, field
 from enum import Enum
 
 from icpqc.model import ANALYSIS_TYPES, Batch, SampleType
+from icpqc.qc import crm
 
 
 class Outcome(str, Enum):
@@ -89,6 +92,31 @@ def _pearson(xs: list[float], ys: list[float]) -> float:
     return sxy / (sxx * syy) ** 0.5
 
 
+def _recovery_row(sample_name: str, label: str, expected: float, result,
+                  lo: float, hi: float) -> dict:
+    """One recovery row, honest about censored results.
+
+    A non-detect in a standard is not a missing number — it bounds recovery from
+    above. When even that bound falls under the window the check can fail with
+    certainty; when it does not, the row says so rather than inventing a value.
+    """
+    row = {"sample": sample_name, "analyte": label, "recovery_pct": None,
+           "window": f"{lo:g}-{hi:g}%", "ok": None}
+    if result is None or (result.conc is None and not result.below_dl):
+        return {**row, "note": "no result"}
+    if result.conc is None:                             # censored
+        if result.dl is None:
+            return {**row, "note": "non-detect, no limit quoted"}
+        bound = result.dl / expected * 100.0
+        if bound < lo:
+            return {**row, "ok": False, "dl": result.dl,
+                    "note": f"non-detect: recovery is at most {bound:.1f}%"}
+        return {**row, "dl": result.dl,
+                "note": f"non-detect at a limit allowing up to {bound:.1f}% — indeterminate"}
+    rec = result.conc / expected * 100.0
+    return {**row, "recovery_pct": round(rec, 1), "ok": lo <= rec <= hi}
+
+
 def _recovery_details(samples, batch: Batch, lo: float, hi: float) -> list[dict]:
     details: list[dict] = []
     for s in samples:
@@ -98,15 +126,8 @@ def _recovery_details(samples, batch: Batch, lo: float, hi: float) -> list[dict]
                             "note": "no expected level in export"})
             continue
         for a in batch.analytes:
-            r = s.results.get(a.label)
-            if r is None or r.conc is None:
-                details.append({"sample": s.name, "analyte": a.label, "recovery_pct": None,
-                                "window": f"{lo:g}-{hi:g}%", "ok": None, "note": "no result"})
-                continue
-            rec = r.conc / s.level * 100.0
-            details.append({"sample": s.name, "analyte": a.label,
-                            "recovery_pct": round(rec, 1),
-                            "window": f"{lo:g}-{hi:g}%", "ok": lo <= rec <= hi})
+            details.append(_recovery_row(s.name, a.label, s.level,
+                                         s.results.get(a.label), lo, hi))
     return details
 
 
@@ -115,15 +136,29 @@ def _blank_details(samples, batch: Batch, params: dict) -> list[dict]:
     for s in samples:
         for a in batch.analytes:
             r = s.results.get(a.label)
-            conc = r.conc if r else None
-            if conc is None:
-                details.append({"sample": s.name, "analyte": a.label, "conc_ppb": None,
-                                "limit_ppb": None, "ok": None, "note": "no result"})
-                continue
             thr = _blank_limit(a.label, params)
-            details.append({"sample": s.name, "analyte": a.label,
-                            "conc_ppb": round(conc, 4), "limit_ppb": thr,
-                            "ok": abs(conc) < thr})
+            base = {"sample": s.name, "analyte": a.label, "conc_ppb": None,
+                    "limit_ppb": thr}
+            if r is None or (r.conc is None and not r.below_dl):
+                details.append({**base, "limit_ppb": None, "ok": None,
+                                "note": "no result"})
+                continue
+            if r.conc is None:                          # censored non-detect
+                if r.dl is not None and r.dl <= thr:
+                    # Detection limit is itself under the threshold, so whatever
+                    # the true value is, it clears — this blank passes on merit.
+                    details.append({**base, "ok": True, "dl_ppb": r.dl,
+                                    "note": "non-detect below the limit"})
+                elif r.dl is not None:
+                    details.append({**base, "ok": None, "dl_ppb": r.dl,
+                                    "note": "non-detect, but at a limit above the "
+                                            "threshold — cannot decide"})
+                else:
+                    details.append({**base, "ok": None,
+                                    "note": "non-detect, no limit quoted"})
+                continue
+            details.append({**base, "conc_ppb": round(r.conc, 4),
+                            "ok": abs(r.conc) < thr})
     return details
 
 
@@ -163,6 +198,129 @@ def cal_low_std(batch: Batch, params: dict) -> CheckResult:
     low = min(stds, key=lambda s: s.level)
     lo, hi = _window(params, (70, 130))
     return _finish("cal_low_std", _recovery_details([low], batch, lo, hi))
+
+
+def cal_back_calc(batch: Batch, params: dict) -> CheckResult:
+    """Every calibration standard back-calculates within its window.
+
+    The correlation coefficient in `cal_linearity` is a summary statistic and a
+    famously permissive one: an unweighted fit through a heteroscedastic ICP-MS
+    curve routinely reports r > 0.999 while the bottom standard reads 50% low,
+    because r is dominated by the top of the range. Eurachem and ICH Q2(R2) both
+    make the same point — linearity is judged on residuals, not on r. This check
+    is that judgement, applied level by level, with a wider window at the bottom
+    where relative error legitimately grows.
+
+    Overlaps `cal_low_std` on the lowest level by design: that check answers "is
+    the reporting limit supported", this one answers "does the whole curve hold".
+    """
+    stds = [s for s in batch.of_type(SampleType.CAL_STD) if s.level]
+    min_levels = int(params.get("min_levels", 3))
+    if len(stds) < min_levels:
+        return _ne("cal_back_calc",
+                   f"need >={min_levels} cal standards with levels, found {len(stds)}")
+    lo, hi = _window(params, (90, 110))
+    low_lo, low_hi = params.get("low_window_pct", [70, 130])
+    lowest = min(s.level for s in stds)
+    details: list[dict] = []
+    for s in sorted(stds, key=lambda s: s.level):
+        is_low = s.level == lowest
+        w_lo, w_hi = (float(low_lo), float(low_hi)) if is_low else (lo, hi)
+        for a in batch.analytes:
+            row = _recovery_row(s.name, a.label, s.level, s.results.get(a.label), w_lo, w_hi)
+            details.append({**row, "level": s.level, "lowest_level": is_low})
+    return _finish("cal_back_calc", details)
+
+
+def cal_heteroscedasticity(batch: Batch, params: dict) -> CheckResult:
+    """Relative calibration error that grows systematically toward the low end.
+
+    The signature of an unweighted least-squares fit on data whose variance
+    scales with concentration — the normal condition in ICP-MS, where counting
+    statistics alone make the bottom of the curve noisier in relative terms. The
+    remedy is a weighted fit (1/x or 1/x^2) in the instrument software; this
+    check cannot apply one, only report that the residuals are asking for it.
+
+    Diagnostic rather than acceptance criteria, so it warns by default. Set
+    `on_exceed: fail` in the pack to make it binding.
+
+    A ratio on its own is not evidence: when the top half happens to land almost
+    exactly on nominal, a 1.5%-vs-0.1% split is a ratio of 15 and means nothing
+    at all. `min_low_err_pct` is the floor that makes the ratio mean something —
+    the low end has to be poor in absolute terms before being disproportionately
+    poor is worth reporting.
+    """
+    stds = sorted([s for s in batch.of_type(SampleType.CAL_STD) if s.level],
+                  key=lambda s: s.level)
+    min_levels = int(params.get("min_levels", 4))
+    if len(stds) < min_levels:
+        return _ne("cal_heteroscedasticity",
+                   f"need >={min_levels} cal standards with levels, found {len(stds)}")
+    max_ratio = float(params.get("max_ratio", 3.0))
+    min_low_err = float(params.get("min_low_err_pct", 10.0))
+    as_fail = str(params.get("on_exceed", "warn")).lower() == "fail"
+    half = len(stds) // 2
+    low_half, high_half = stds[:half], stds[-half:]
+
+    def _rel_errors(samples: list, label: str) -> list[float]:
+        """|measured - nominal| / nominal, in %, over the levels that reported."""
+        out = []
+        for s in samples:
+            r = s.results.get(label)
+            if r is None or r.conc is None:      # censored or absent: no residual
+                continue
+            out.append(abs(r.conc - s.level) / s.level * 100.0)
+        return out
+
+    details: list[dict] = []
+    flagged = 0
+    for a in batch.analytes:
+        low_err = _rel_errors(low_half, a.label)
+        high_err = _rel_errors(high_half, a.label)
+        base = {"analyte": a.label, "max_ratio": max_ratio,
+                "min_low_err_pct": min_low_err,
+                "n_low": len(low_err), "n_high": len(high_err)}
+        if len(low_err) < 2 or len(high_err) < 2:
+            details.append({**base, "ok": None,
+                            "note": "need >=2 reported levels in each half"})
+            continue
+        low_med, high_med = statistics.median(low_err), statistics.median(high_err)
+        row = {**base, "low_rel_err_pct": round(low_med, 2),
+               "high_rel_err_pct": round(high_med, 2)}
+        if high_med <= 0:
+            # A perfect top half makes the ratio undefined, not infinite. Say so
+            # rather than manufacturing a division that would flag every analyte.
+            details.append({**row, "ratio": None, "ok": None,
+                            "note": "top half fits exactly — ratio undefined"})
+            continue
+        ratio = low_med / high_med
+        row["ratio"] = round(ratio, 2)
+        if ratio > max_ratio and low_med >= min_low_err:
+            flagged += 1
+            details.append({**row, "ok": False if as_fail else None,
+                            "note": (f"low-end relative error is {low_med:.1f}%, {ratio:.1f}x the "
+                                     "high end — variance scales with concentration; an unweighted "
+                                     "fit understates the bottom of the curve. Consider weighted "
+                                     "least squares (1/x or 1/x^2).")})
+        elif ratio > max_ratio:
+            # Disproportionate but tiny: the top half simply landed on nominal.
+            # Reporting this as a finding would cry wolf on every good curve.
+            details.append({**row, "ok": True,
+                            "note": (f"{ratio:.1f}x the high end, but only {low_med:.2f}% in "
+                                     f"absolute terms (floor {min_low_err:g}%) — not actionable")})
+        else:
+            details.append({**row, "ok": True})
+
+    if flagged and as_fail:
+        return CheckResult("cal_heteroscedasticity", Outcome.FAIL,
+                           reason=f"{flagged} analyte(s) exceed the low/high error ratio",
+                           details=details)
+    if flagged:
+        return CheckResult("cal_heteroscedasticity", Outcome.WARN,
+                           reason=(f"{flagged} analyte(s) show low-end relative error above "
+                                   f"{max_ratio:g}x the high end — weighted fit indicated"),
+                           details=details)
+    return _finish("cal_heteroscedasticity", details)
 
 
 def icv_recovery(batch: Batch, params: dict) -> CheckResult:
@@ -221,6 +379,82 @@ def method_blank(batch: Batch, params: dict) -> CheckResult:
     return _finish("method_blank", _blank_details(mbs, batch, params))
 
 
+def blank_derived_lod(batch: Batch, params: dict) -> CheckResult:
+    """Detection/quantitation limits implied by this run's own blank scatter.
+
+    The classic 3-sigma/10-sigma estimate, computed on the calibration blanks
+    acquired *after* the calibration curve — the only blanks whose scatter
+    reflects the instrument as it actually ran the samples. Compared against the
+    LOQ the rule pack declares.
+
+    This is the one check that audits the configuration rather than the batch: a
+    reporting limit carried over from a better day makes every blank and every
+    RPD threshold downstream of it optimistic, and nothing else would notice.
+    """
+    wanted, unknown = [], []
+    for name in params.get("blank_types", ["ICB", "CCB"]):
+        try:
+            wanted.append(SampleType(str(name)))
+        except ValueError:
+            unknown.append(str(name))
+    if not wanted:
+        return _ne("blank_derived_lod",
+                   f"no usable blank types configured (unrecognized: {', '.join(unknown)})")
+
+    blanks = batch.of_type(*wanted)
+    if params.get("after_calibration", True):
+        cal = batch.of_type(SampleType.CAL_STD)
+        if cal:
+            last_cal = max(s.seq_index for s in cal)
+            blanks = [b for b in blanks if b.seq_index > last_cal]
+
+    min_n = int(params.get("min_n", 3))
+    if len(blanks) < min_n:
+        return _ne("blank_derived_lod",
+                   f"need >={min_n} post-calibration blanks of type "
+                   f"{'/'.join(t.value for t in wanted)}, found {len(blanks)}")
+
+    k_lod, k_loq = float(params.get("k_lod", 3)), float(params.get("k_loq", 10))
+    strict = str(params.get("on_exceed", "warn")).lower() == "fail"
+
+    details, exceeded = [], 0
+    for a in batch.analytes:
+        vals = []
+        for b in blanks:
+            r = b.results.get(a.label)
+            if r is not None and r.conc is not None:
+                vals.append(r.conc)
+        if len(vals) < min_n:
+            # Blanks reported as "<DL" carry no number to take a spread of; say
+            # that plainly instead of computing a standard deviation of nothing.
+            details.append({"analyte": a.label, "n": len(vals), "ok": None,
+                            "note": f"only {len(vals)} numeric blank result(s); "
+                                    f"need {min_n} (non-detects carry no value)"})
+            continue
+        sd = statistics.stdev(vals)
+        derived_loq = k_loq * sd
+        configured = _loq_for(a.label, params)
+        over = derived_loq > configured
+        exceeded += over
+        details.append({
+            "analyte": a.label, "n": len(vals), "blank_sd": round(sd, 5),
+            "derived_lod": round(k_lod * sd, 5), "derived_loq": round(derived_loq, 5),
+            "configured_loq": configured,
+            "ok": False if (over and strict) else (None if over else True),
+            **({"note": "blank scatter implies a higher LOQ than the pack configures"}
+               if over else {}),
+        })
+
+    if exceeded and not strict:
+        return CheckResult(
+            "blank_derived_lod", Outcome.WARN,
+            reason=f"{exceeded} analyte(s) whose blank scatter implies an LOQ above "
+                   f"the configured value",
+            details=details)
+    return _finish("blank_derived_lod", details,
+                   warn_reason="no analyte had enough numeric blank results")
+
+
 def istd_recovery(batch: Batch, params: dict) -> CheckResult:
     """ISTD intensity of every post-calibration sample vs the ICAL reference.
 
@@ -272,6 +506,88 @@ def lcs_recovery(batch: Batch, params: dict) -> CheckResult:
         return _ne("lcs_recovery", "no LCS in batch")
     lo, hi = _window(params, (80, 120))
     return _finish("lcs_recovery", _recovery_details(lcs, batch, lo, hi))
+
+
+def crm_recovery(batch: Batch, params: dict) -> CheckResult:
+    """Reference material recovery, per reference value.
+
+    Unlike every other recovery check, the expected values do not come from the
+    export: a reference material carries dozens of elements at dozens of
+    different values and the Level column can hold only one. They come from the
+    certificate or compilation, kept as YAML in the CRM library (see
+    configs/crm/README.md).
+
+    Values marked `information` are reported but never decide the outcome. In a
+    geochemical compilation that class can rest on a single lab's measurement,
+    and failing someone's batch on one would be indefensible.
+    """
+    try:
+        library = crm.load_library(str(params.get("library", "crm")))
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        return _ne("crm_recovery", f"CRM library unavailable: {exc}")
+    if not library:
+        return _ne("crm_recovery",
+                   "CRM library is empty — add a certificate to configs/crm/")
+
+    hits = [(s, ref) for s in batch.samples
+            if (ref := crm.match_sample(library, s.name)) is not None]
+    if not hits:
+        return _ne("crm_recovery",
+                   f"no sample name matched any of the {len(library)} material(s) in "
+                   f"the library ({', '.join(r.id for r in library)})")
+
+    lo, hi = _window(params, (80, 120))
+    details: list[dict] = []
+    for s, ref in hits:
+        for a in batch.analytes:
+            cert = ref.certified.get(a.element) if a.element else None
+            if cert is None:
+                continue                        # not certified in this material
+            row = {"sample": s.name, "crm": ref.id, "analyte": a.label,
+                   "reference": cert.value, "unit": ref.unit,
+                   "value_type": cert.value_type,
+                   "recovery_pct": None, "window": f"{lo:g}-{hi:g}%", "ok": None}
+            r = s.results.get(a.label)
+            if r is None or (r.conc is None and not r.below_dl):
+                details.append({**row, "note": "no result"})
+                continue
+            expected = crm.convert(cert.value, ref.unit, r.unit)
+            if expected is None:
+                details.append({**row, "note": f"cannot convert reference {ref.unit} "
+                                               f"to reported {r.unit}"})
+                continue
+            if not expected:
+                details.append({**row, "note": "reference value is zero"})
+                continue
+
+            out = _recovery_row(s.name, a.label, expected, r, lo, hi)
+            merged = {**row, **out}
+            if cert.uncertainty is not None and out.get("recovery_pct") is not None:
+                u = crm.convert(cert.uncertainty, ref.unit, r.unit)
+                if u is not None:
+                    # Context, never the criterion: the source's uncertainty is
+                    # far tighter than any method's recovery window.
+                    merged["within_ref_uncert"] = abs(r.conc - expected) <= u
+            if not cert.decisive:
+                # Downgrade to informational without losing the number: the
+                # recovery is still shown, it just cannot fail anyone's batch.
+                merged["ok"] = None
+                merged["note"] = (f"{cert.value_type} value — reported, not decisive"
+                                  + (f"; {merged['note']}" if merged.get("note") else ""))
+            details.append(merged)
+
+        if ref.unfilled:
+            # A half-transcribed file is normal; a silent one is not. Say which
+            # elements the library still owes, so "PASS" is not read as "checked".
+            details.append({"sample": s.name, "crm": ref.id, "analyte": "-",
+                            "ok": None,
+                            "note": f"{len(ref.unfilled)} element(s) in this material "
+                                    f"have no value yet: {', '.join(ref.unfilled[:12])}"
+                                    + (" …" if len(ref.unfilled) > 12 else "")})
+
+    return _finish("crm_recovery", details,
+                   warn_reason="a reference material was matched but none of its "
+                               "values were measured in this batch")
 
 
 def dup_rpd(batch: Batch, params: dict) -> CheckResult:
@@ -376,6 +692,115 @@ def serial_dilution(batch: Batch, params: dict) -> CheckResult:
                    warn_reason="serial dilution present but parent below assessment threshold")
 
 
+def _norm_name(s: str) -> str:
+    """Fold the cosmetic differences between a laser comment and a sample name."""
+    return re.sub(r"[\s_\-.]+", "", s or "").casefold()
+
+
+def laser_log_alignment(batch: Batch, params: dict) -> CheckResult:
+    """Do the laser's own record and the reduced results describe the same run?
+
+    The laser and the mass spectrometer keep separate clocks started by separate
+    computers, so the correspondence between ablations and results is always a
+    reconstruction. When it slips — a missed trigger, a dropped sequence, an
+    off-by-one — every concentration downstream is attributed to the wrong spot
+    and nothing complains. This check is the complaint.
+
+    icpqc does not do the alignment (that is reduction, and pewpew/Ilaps/iolite/
+    laserTRAM already do it). It only asks whether the answer survives comparison
+    with the laser log.
+
+    **Granularity** is the crux and cannot be assumed: one log *sequence* is one
+    pattern, and depending on the workflow a reduced row is either one pattern (a
+    raster image) or one *ablation* inside it (a spot). `granularity: auto`
+    settles it by whichever count matches — and when neither does, that failure to
+    match is itself the finding, reported with both numbers rather than resolved
+    by picking the closer one.
+    """
+    log = batch.laser_log
+    if log is None:
+        return _ne("laser_log_alignment",
+                   "no laser log supplied (pass --laser-log <LaserLog.csv>)")
+    if not log.ablations:
+        return _ne("laser_log_alignment",
+                   "laser log contains no ablations (no State=On rows)")
+
+    n_samples = len(batch.samples)
+    n_seq, n_abl = len(log.sequences), len(log.ablations)
+    wanted = str(params.get("granularity", "auto")).lower()
+
+    if wanted == "auto":
+        if n_samples == n_seq:
+            granularity, units = "sequence", log.sequences
+        elif n_samples == n_abl:
+            granularity, units = "ablation", log.ablations
+        else:
+            return CheckResult(
+                "laser_log_alignment", Outcome.FAIL,
+                reason=(f"{n_samples} result row(s) match neither the log's "
+                        f"{n_seq} sequence(s) nor its {n_abl} ablation(s)"),
+                details=[{"granularity": "auto", "result_rows": n_samples,
+                          "log_sequences": n_seq, "log_ablations": n_abl,
+                          "ok": False,
+                          "note": "the run and the results disagree on how many "
+                                  "things were measured — resolve this before "
+                                  "trusting any number in the batch"}])
+    elif wanted == "sequence":
+        granularity, units = "sequence", log.sequences
+    elif wanted == "ablation":
+        granularity, units = "ablation", log.ablations
+    else:
+        return _ne("laser_log_alignment",
+                   f"unknown granularity {wanted!r} (use auto, sequence or ablation)")
+
+    details: list[dict] = [{
+        "granularity": granularity, "result_rows": n_samples,
+        "log_sequences": n_seq, "log_ablations": n_abl,
+        "ok": len(units) == n_samples,
+        "note": (f"counts agree at {granularity} granularity"
+                 if len(units) == n_samples
+                 else f"{len(units)} log {granularity}(s) vs {n_samples} result row(s)"),
+    }]
+
+    # Name agreement, position by position: the cheapest off-by-one detector there
+    # is, and it needs no timing data at all.
+    if params.get("require_name_match", True):
+        for i, (unit, sample) in enumerate(zip(units, batch.samples), start=1):
+            log_name = unit.comment
+            if not log_name:
+                continue
+            a, b = _norm_name(log_name), _norm_name(sample.name)
+            ok = bool(a) and (a == b or a in b or b in a)
+            if not ok:
+                details.append({"position": i, "log_comment": log_name,
+                                "result_sample": sample.name, "ok": False,
+                                "note": "laser log and results disagree at this "
+                                        "position — suspect a shifted assignment"})
+
+    # An ablation much shorter than its neighbours is an aborted shot; the reduced
+    # result for it exists but rests on less signal than everything around it.
+    tol = float(params.get("max_duration_dev_pct", 25))
+    durations = [a.duration_s for a in log.ablations if a.duration_s]
+    if len(durations) >= 3:
+        median = sorted(durations)[len(durations) // 2]
+        if median > 0:
+            odd = [a for a in log.ablations if a.duration_s
+                   and abs(a.duration_s - median) / median * 100 > tol]
+            details.append({
+                "ablations": len(durations), "median_duration_s": round(median, 3),
+                "tolerance_pct": tol, "outliers": len(odd),
+                "ok": None if odd else True,
+                **({"note": "ablation(s) whose firing time deviates from the run: #"
+                            + ", #".join(str(a.index) for a in odd[:8])
+                            + (" …" if len(odd) > 8 else "")} if odd else {}),
+            })
+
+    for w in log.warnings:
+        details.append({"ok": None, "note": f"laser log: {w}"})
+
+    return _finish("laser_log_alignment", details)
+
+
 def seq_structure(batch: Batch, params: dict) -> CheckResult:
     """Required QC sample types are present in the batch."""
     required = [str(t) for t in params.get("require", [])]
@@ -390,16 +815,21 @@ def seq_structure(batch: Batch, params: dict) -> CheckResult:
 #: catalog order == report order (SPEC §4)
 CATALOG = {
     "cal_linearity": cal_linearity,
+    "cal_back_calc": cal_back_calc,
+    "cal_heteroscedasticity": cal_heteroscedasticity,
     "cal_low_std": cal_low_std,
     "icv_recovery": icv_recovery,
     "ccv_recovery": ccv_recovery,
     "ccv_frequency": ccv_frequency,
     "icb_ccb_blank": icb_ccb_blank,
     "method_blank": method_blank,
+    "blank_derived_lod": blank_derived_lod,
     "istd_recovery": istd_recovery,
     "lcs_recovery": lcs_recovery,
+    "crm_recovery": crm_recovery,
     "dup_rpd": dup_rpd,
     "ms_msd": ms_msd,
     "serial_dilution": serial_dilution,
+    "laser_log_alignment": laser_log_alignment,
     "seq_structure": seq_structure,
 }

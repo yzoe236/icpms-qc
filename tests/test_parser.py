@@ -14,7 +14,7 @@ def test_parse_reference_layout(pass_csv):
 
     assert len(batch.of_type(SampleType.CAL_STD)) == 5
     assert len(batch.of_type(SampleType.CCV)) == 2
-    assert len(batch.of_type(SampleType.SAMPLE)) == 15
+    assert len(batch.of_type(SampleType.SAMPLE)) == 14
 
     dup = batch.of_type(SampleType.DUP)[0]
     assert dup.name == "S003-DUP"

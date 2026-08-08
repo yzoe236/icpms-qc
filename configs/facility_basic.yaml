@@ -12,15 +12,26 @@ shared:
     default: 0.1
 checks:
   cal_linearity:   { enabled: true,  params: { min_r: 0.95 },                              verify: "facility SOP / MassHunter outlier setting" }
+  # A research curve is allowed to be looser than a compliance one, but "r was
+  # fine" still should not be the only thing anyone looked at.
+  cal_back_calc:   { enabled: true,  params: { window_pct: [80, 120], low_window_pct: [70, 130], min_levels: 3 }, verify: "facility SOP — per-level back-calculation tolerance" }
+  cal_heteroscedasticity: { enabled: true, params: { max_ratio: 4.0, min_low_err_pct: 12.0, min_levels: 4, on_exceed: warn }, verify: "Eurachem/ICH Q2(R2) — weighted regression indicator" }
   cal_low_std:     { enabled: true,  params: { window_pct: [70, 130] },                    verify: "facility SOP" }
   icv_recovery:    { enabled: false, params: {} }
   ccv_recovery:    { enabled: true,  params: { window_pct: [80, 120] },                    verify: "facility SOP (QC1-5 standard re-reads)" }
   ccv_frequency:   { enabled: true,  params: { every_n: 30, end_of_run: true },            verify: "facility SOP" }
   icb_ccb_blank:   { enabled: true,  params: { limit: "LOQ" },                             verify: "facility SOP (BlkVrfy rinses)" }
   method_blank:    { enabled: false, params: {} }
+  # The rinse/blank-verify reads after the curve are exactly the population this
+  # estimate wants, and a facility run usually has plenty of them.
+  blank_derived_lod: { enabled: true, params: { blank_types: [CCB, ICB], k_lod: 3, k_loq: 10, min_n: 3, on_exceed: warn }, verify: "facility SOP — how the reporting limit was set" }
   istd_recovery:   { enabled: true,  params: { window_pct: [60, 130], reference: "ical" }, verify: "facility SOP" }
   lcs_recovery:    { enabled: false, params: {} }
+  crm_recovery:    { enabled: true,  params: { library: crm, window_pct: [80, 120] },      verify: "certificate of analysis" }
   dup_rpd:         { enabled: false, params: {} }
   ms_msd:          { enabled: false, params: {} }
   serial_dilution: { enabled: false, params: {} }
+  # Audits the laser-vs-ICP correspondence when a laser log is supplied
+  # (--laser-log). NOT_EVALUATED without one, which is the solution-mode norm.
+  laser_log_alignment: { enabled: true, params: { granularity: auto, require_name_match: true, max_duration_dev_pct: 25 }, verify: "LA-ICP-MS: laser log vs reduced results — sequence/ablation granularity is workflow-specific" }
   seq_structure:   { enabled: true,  params: { require: [CCV, CCB] },                      verify: "facility SOP" }

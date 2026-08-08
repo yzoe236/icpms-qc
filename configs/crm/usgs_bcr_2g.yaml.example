@@ -1,0 +1,116 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SKELETON — VALUES DELIBERATELY EMPTY. Transcribe them yourself.
+#
+# USGS BCR-2G (Columbia River basalt glass)
+#
+# HOW TO USE
+#   1. Fill `value:` (and `uncertainty:` where the source gives one) for the
+#      elements you actually measure. Delete the rows you do not — an unfilled
+#      row is skipped and announced in the report, never silently treated as
+#      checked, but a shorter file is easier to review.
+#   2. Set each `type:` honestly — see below. This decides whether a value can
+#      fail someone's batch.
+#   3. Fill `provenance:` completely. A compilation value without its data set
+#      version is not reproducible: GeoReM's preferred value for a material
+#      changes between releases, and a report that cannot name the release
+#      cannot be re-derived in three years.
+#   4. Rename this file from *.yaml.example to *.yaml — only then is it loaded.
+#
+# VALUE TYPES
+#   certified    certificate of analysis, metrologically traceable   → can FAIL
+#   reference    compilation "preferred"/reference value             → can FAIL
+#   information  indicative, may rest on a single lab                → reported only
+#
+# UNITS
+#   `unit:` applies to every value in this file. Trace elements on geological
+#   glasses are conventionally ppm (µg/g). Major elements are quoted in wt% —
+#   either convert them to ppm (1 wt% = 10 000 ppm) or keep them in a separate
+#   file with `unit: %`. Do not mix.
+# ─────────────────────────────────────────────────────────────────────────────
+
+id: usgs_bcr_2g
+name: USGS BCR-2G (Columbia River basalt glass)
+matrix: basaltic glass
+unit: ppm                      # µg/g — confirm against your source
+
+# Most values on these materials are compilation values, not certificate
+# values. Override per element where the source says otherwise.
+default_value_type: reference
+
+note: >-
+  !! BCR-2G (glass) is NOT BCR-2 (powder) — different preparation, different
+  preferred values. The patterns below require the G on purpose; do not
+  loosen them.
+
+source: "FILL — e.g. GeoReM http://georem.mpch-mainz.gwdg.de/ , or the USGS/NIST certificate PDF"
+provenance:
+  compilation: ""              # FILL — "GeoReM" | "USGS" | "NIST certificate"
+  version: ""                  # FILL — data set / certificate revision
+  accessed: ""                 # FILL — YYYY-MM-DD
+  citation: ""                 # FILL — copy the current "how to cite" from the source
+
+match:
+  name_patterns:
+    - '(?i)\bBCR[\s_-]*2[\s_-]*G\b'
+
+certified:
+  # ── light / volatile ────────────────────────────────────────
+  Li:  { value: , uncertainty: }
+  Be:  { value: , uncertainty: }
+  B:   { value: , uncertainty: }
+
+  # ── transition metals ───────────────────────────────────────
+  Sc:  { value: , uncertainty: }
+  Ti:  { value: , uncertainty: }
+  V:   { value: , uncertainty: }
+  Cr:  { value: , uncertainty: }
+  Mn:  { value: , uncertainty: }
+  Co:  { value: , uncertainty: }
+  Ni:  { value: , uncertainty: }
+  Cu:  { value: , uncertainty: }
+  Zn:  { value: , uncertainty: }
+  Ga:  { value: , uncertainty: }
+
+  # ── LILE ────────────────────────────────────────────────────
+  Rb:  { value: , uncertainty: }
+  Sr:  { value: , uncertainty: }
+  Cs:  { value: , uncertainty: }
+  Ba:  { value: , uncertainty: }
+
+  # ── HFSE ────────────────────────────────────────────────────
+  Y:   { value: , uncertainty: }
+  Zr:  { value: , uncertainty: }
+  Nb:  { value: , uncertainty: }
+  Hf:  { value: , uncertainty: }
+  Ta:  { value: , uncertainty: }
+  Mo:  { value: , uncertainty: }
+  W:   { value: , uncertainty: }
+
+  # ── REE ─────────────────────────────────────────────────────
+  La:  { value: , uncertainty: }
+  Ce:  { value: , uncertainty: }
+  Pr:  { value: , uncertainty: }
+  Nd:  { value: , uncertainty: }
+  Sm:  { value: , uncertainty: }
+  Eu:  { value: , uncertainty: }
+  Gd:  { value: , uncertainty: }
+  Tb:  { value: , uncertainty: }
+  Dy:  { value: , uncertainty: }
+  Ho:  { value: , uncertainty: }
+  Er:  { value: , uncertainty: }
+  Tm:  { value: , uncertainty: }
+  Yb:  { value: , uncertainty: }
+  Lu:  { value: , uncertainty: }
+
+  # ── chalcophile / heavy ─────────────────────────────────────
+  Ag:  { value: , uncertainty: }
+  Cd:  { value: , uncertainty: }
+  Sn:  { value: , uncertainty: }
+  Sb:  { value: , uncertainty: }
+  Tl:  { value: , uncertainty: }
+  Pb:  { value: , uncertainty: }
+  Bi:  { value: , uncertainty: }
+
+  # ── actinides ───────────────────────────────────────────────
+  Th:  { value: , uncertainty: }
+  U:   { value: , uncertainty: }

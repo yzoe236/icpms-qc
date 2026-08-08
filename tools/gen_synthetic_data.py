@@ -28,6 +28,15 @@ SENS_CPS_PER_PPB = 2_000.0
 CAL_LEVELS = [1.0, 5.0, 10.0, 50.0, 100.0]
 SPIKE_PPB = 25.0
 
+#: A fabricated "certified" reference material, one value per element, mirroring
+#: configs/crm/example_synthetic_water.yaml. A real CRM certifies every element at
+#: a different value — which is exactly why it cannot be expressed as a single
+#: Level column, and why crm_recovery reads the values from the library instead.
+CRM_NAME = "CRM-EXAMPLE-1"
+CRM_CERTIFIED = {"9 Be": 20.0, "52 Cr [He]": 40.0, "60 Ni [He]": 30.0,
+                 "63 Cu [He]": 60.0, "66 Zn [He]": 80.0, "75 As [He]": 15.0,
+                 "111 Cd": 10.0, "208 Pb": 25.0}
+
 
 def _noise(rng: random.Random, sd: float = 0.02) -> float:
     return rng.gauss(1.0, sd)
@@ -38,7 +47,10 @@ def _row(rng, seq, name, stype, level, conc_by_analyte, istd_scale=1.0):
            "Level [ppb]": f"{level:g}" if level is not None else ""}
     for a in ANALYTES:
         conc = conc_by_analyte.get(a, 0.0)
-        measured = conc * _noise(rng) if conc > 0 else abs(rng.gauss(0.005, 0.01))
+        # Blank scatter is deliberately well under the 0.1 ppb LOQ the rule packs
+        # configure, so blank_derived_lod's 10-sigma estimate clears it — i.e. the
+        # reference batch depicts a run whose reporting limit is defensible.
+        measured = conc * _noise(rng) if conc > 0 else abs(rng.gauss(0.005, 0.003))
         row[f"{a} Conc. [ppb]"] = f"{measured:.4f}"
         row[f"{a} CPS"] = f"{measured * SENS_CPS_PER_PPB * _noise(rng):.0f}"
     for istd, base in ISTDS.items():
@@ -97,12 +109,18 @@ def generate(path: str, violations: bool = False, seed: int = 42) -> int:
     emit("CCB #1", "CCB")
 
     # --- analysis segment 2: exactly 10 analyses, then closing CCV/CCB -------
-    for i in range(6, 16):                                  # S006..S015
+    for i in range(6, 15):                                  # S006..S014
         istd_scale = rng.uniform(0.90, 1.0)
         if violations and i >= 13:
             istd_scale = 0.65
         emit(f"S{i:03d}", "Sample",
              conc={a: rng.uniform(0.5, 80.0) for a in ANALYTES}, istd_scale=istd_scale)
+
+    # 10th analysis of the segment: the reference material. Its ISTD draw happens
+    # in both modes (identical RNG stream) but is never overridden — the injected
+    # ISTD drift stays attributable to the S0xx samples alone.
+    crm_istd = rng.uniform(0.90, 1.0)
+    emit(CRM_NAME, "LCS", conc=dict(CRM_CERTIFIED), istd_scale=crm_istd)
 
     emit("CCV-50 #2", "CCV", level=50.0, conc=flat(50.0 * rng.uniform(0.97, 1.03)))
     emit("CCB #2", "CCB")

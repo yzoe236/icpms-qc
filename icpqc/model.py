@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:                      # keeps the model free of io/ at runtime
+    from icpqc.io.laserlog import LaserLog
 
 
 class SampleType(str, Enum):
@@ -39,6 +43,30 @@ class Analyte:
     mass: int | None = None
     element: str | None = None
     istd_label: str | None = None
+    #: Q2 mass on a triple-quad (8800/8900) run in MS/MS mode — "31 -> 47 P [O2]"
+    #: measures P at m/z 31 in Q1 and its O2 adduct at 47 in Q2. None on
+    #: single-quad instruments and on QQQ runs exported without the shift.
+    mass_shift: int | None = None
+    #: collision/reaction cell mode as exported — "He", "No Gas", "O2", "HEHe".
+    #: Whitespace-collapsed but otherwise verbatim: the same cell gas is spelled
+    #: differently across software versions, and inventing a canonical spelling
+    #: would silently merge two columns a lab deliberately keeps apart.
+    mode: str | None = None
+
+    @property
+    def is_msms(self) -> bool:
+        """True for a triple-quad MS/MS acquisition (Q1 and Q2 both set)."""
+        return self.mass_shift is not None
+
+    @property
+    def key(self) -> str:
+        """Element+mass+mode identity, for grouping the same element across modes."""
+        parts = [self.element or "?", str(self.mass or "?")]
+        if self.mass_shift is not None:
+            parts.append(f"->{self.mass_shift}")
+        if self.mode:
+            parts.append(f"[{self.mode}]")
+        return " ".join(parts)
 
 
 @dataclass
@@ -48,6 +76,22 @@ class Result:
     intensity: float | None = None
     istd_intensity: float | None = None
     flags: list[str] = field(default_factory=list)
+    #: The export said "<0.05" or "ND" — the analyte was measured and not
+    #: detected. Distinct from conc=None, which means nothing was reported at
+    #: all. Conflating the two makes a clean blank look like a missing one.
+    below_dl: bool = False
+    #: The detection limit quoted alongside a censored result ("<0.05" -> 0.05).
+    #: None when the export censored without a number ("ND").
+    dl: float | None = None
+
+    @property
+    def upper_bound(self) -> float | None:
+        """Largest concentration consistent with this result, or None if unknown.
+
+        A censored result is not a measurement but it is not nothing either: it
+        bounds the truth from above, which is enough to decide a blank check.
+        """
+        return self.dl if (self.below_dl and self.conc is None) else self.conc
 
 
 @dataclass
@@ -71,6 +115,10 @@ class Batch:
     istds: list[Analyte] = field(default_factory=list)
     samples: list[Sample] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    #: Laser ablation log for this run, when one was supplied. The laser and the
+    #: mass spectrometer keep separate clocks, so which counts belong to which
+    #: ablation is a reconstruction — this is the record it can be audited against.
+    laser_log: "LaserLog | None" = None
 
     def of_type(self, *types: SampleType) -> list[Sample]:
         return [s for s in self.samples if s.type in types]
