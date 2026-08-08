@@ -8,7 +8,7 @@ a rule pack.
 ## Read this first
 
 **icpms-qc ships typical values, not method text.** The thresholds in
-`configs/*.yaml` are defaults chosen to be recognisable, not transcriptions of
+`icpms_qc/configs/*.yaml` are defaults chosen to be recognisable, not transcriptions of
 any standard. Before any compliance use, verify every threshold against the
 current revision of the method your laboratory actually runs under, and record
 that you did.
@@ -48,7 +48,7 @@ plain words; your SOP supplies the clause.
 | `blank_derived_lod` | The configured LOQ is defensible against this run's own blank scatter | 40 CFR 136 App. B; IUPAC; ISO 11843 | **3σ/10σ on a handful of blanks is not an MDL study** — 40 CFR wants 7+ replicates. Audits configuration, not the batch |
 | `istd_recovery` | Internal standard response holds against the calibration block | 6020B / 200.8 internal standards | **The two methods use different windows** — confirm which applies |
 | `lcs_recovery` | Laboratory control sample recovers within window | 6020B LCS / 200.8 LFB | Often superseded by in-house control limits |
-| `crm_recovery` | Certified material recovers against its certificate | Certificate of analysis; lab control limits | Values come from `configs/crm/*.yaml` — the certificate is the authority |
+| `crm_recovery` | Certified material recovers against its certificate | Certificate of analysis; lab control limits | Values come from `icpms_qc/configs/crm/*.yaml` — the certificate is the authority |
 | `dup_rpd` | Duplicate agreement within RPD, above a concentration floor | 6020B / 200.8 duplicate criteria | **See the replicate-hierarchy caveat below** |
 | `ms_msd` | Matrix spike recovery and RPD within window | 6020B / 200.8 matrix spike criteria | — |
 | `serial_dilution` | Diluted result agrees, above a concentration floor | 6020B serial dilution test | Not a standard 200.8 element |

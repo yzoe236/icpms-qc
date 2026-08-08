@@ -163,9 +163,9 @@ neither matches, *that* is the finding, reported with both numbers.
 ### Reference materials
 
 A CRM certifies dozens of elements at dozens of different values, so it does not fit the
-single Level column an export carries. Certified values live in `configs/crm/*.yaml` —
+single Level column an export carries. Certified values live in `icpms_qc/configs/crm/*.yaml` —
 one file per material, matched to samples by name, versioned in git next to the rule
-packs. See [`configs/crm/README.md`](configs/crm/README.md).
+packs. See [`icpms_qc/configs/crm/README.md`](icpms_qc/configs/crm/README.md).
 
 ```yaml
 unit: ppb
@@ -181,11 +181,11 @@ and belongs in the rule pack.
 ## Design in one paragraph
 
 Exports vary wildly across MassHunter versions and report templates, so parsing is
-**template-driven**: a small YAML mapping (`configs/*.template.yaml`) turns your lab's
+**template-driven**: a small YAML mapping (`icpms_qc/configs/*.template.yaml`) turns your lab's
 export layout into a canonical batch model, and the QC engine only ever sees the canonical
 model. Adding an instrument or a new export layout = contributing a template file, not
 forking the engine. QC logic itself is a set of small, method-agnostic checks that rule
-packs (`configs/*.yaml`) parameterize with your method's limits.
+packs (`icpms_qc/configs/*.yaml`) parameterize with your method's limits.
 
 ## Status
 

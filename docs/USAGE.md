@@ -162,8 +162,8 @@ what automation and agents should read, not the HTML.
 The shipped packs are **typical defaults, not method text**. Copy one and edit:
 
 ```bash
-cp configs/epa6020b.yaml configs/mylab.yaml
-icpms-qc check my_batch.csv --rules configs/mylab.yaml
+cp icpms_qc/configs/epa6020b.yaml icpms_qc/configs/mylab.yaml
+icpms-qc check my_batch.csv --rules icpms_qc/configs/mylab.yaml
 ```
 
 A pack entry looks like:
@@ -187,7 +187,7 @@ checks:
 Keep your pack in git. That's the point: **your QC policy becomes a reviewable,
 diffable file** rather than a setting someone changed once.
 
-`configs/facility_basic.yaml` is a good starting point for a research facility —
+`icpms_qc/configs/facility_basic.yaml` is a good starting point for a research facility —
 it evaluates the calibration and QC re-reads that such runs actually contain, and
 leaves the EPA batch-QC checks (method blank, LCS, spikes) switched off rather
 than failing you for not having them.
@@ -198,7 +198,7 @@ than failing you for not having them.
 
 A CRM certifies dozens of elements at dozens of different values, which does not
 fit the single Level column an export carries. Put the certificate in
-`configs/crm/`:
+`icpms_qc/configs/crm/`:
 
 ```yaml
 id: nist_srm_1640a
@@ -219,7 +219,7 @@ are shown but cannot fail anyone's batch.
 Six skeletons for the geological glasses (NIST SRM 610/612, BCR-2G, BHVO-2G,
 BIR-1G, GSD-1G) ship as `*.yaml.example` with every value empty — fill in the
 ones you measure and rename to `.yaml`. See
-[`configs/crm/README.md`](../configs/crm/README.md).
+[`icpms_qc/configs/crm/README.md`](../configs/crm/README.md).
 
 ---
 

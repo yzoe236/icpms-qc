@@ -24,7 +24,7 @@ employer-owned code and no client data were consulted.
 ```
 export CSV ──► io/ (template-driven parser) ──► canonical BatchModel
                                                       │
-                       configs/ rule pack (YAML) ──► qc/ engine ──► CheckResult[]
+                       icpms_qc/configs/ rule pack (YAML) ──► qc/ engine ──► CheckResult[]
                                                       │
                                              report/ (HTML + JSON)
                                                       │
@@ -101,7 +101,7 @@ packs — confirm against the current method text before compliance use.**
 | `instrument_flags` | the instrument software's own QC objections, carried into the report | reported; `on_flag: fail` to bind |
 | `istd_recovery` | ISTD intensity vs reference (ICAL std/blank) | 200.8-pack: 60–125% · 6020B-pack: 70–130% (**verify**) |
 | `lcs_recovery` | lab control sample | 80–120% |
-| `crm_recovery` | certified reference material, per certified element | 80–120% vs `configs/crm/*.yaml` |
+| `crm_recovery` | certified reference material, per certified element | 80–120% vs `icpms_qc/configs/crm/*.yaml` |
 | `dup_rpd` | duplicate relative percent difference | ≤ 20% (when both > 5×LOQ) |
 | `ms_msd` | matrix spike / spike dup recovery + RPD | 75–125%, RPD ≤ 20% |
 | `serial_dilution` | 5× dilution agreement (conc sufficiently above LOQ) | within ±10% |
@@ -113,7 +113,7 @@ Per-check outcome: `PASS / FAIL / WARN / NOT_EVALUATED(reason)` — a check that
 
 ## 5. Rule packs
 
-`configs/epa6020b.yaml` (ships as example), `configs/epa200_8.yaml`, `configs/custom.example.yaml`.
+`icpms_qc/configs/epa6020b.yaml` (ships as example), `icpms_qc/configs/epa200_8.yaml`, `icpms_qc/configs/custom.example.yaml`.
 Each entry: `check id → {enabled, params, verify: <method section to confirm>}`. Labs
 version their pack in git → the QC policy itself becomes reviewable and auditable.
 
@@ -160,7 +160,7 @@ What the check can establish without touching a single count:
 The log also carries timestamped `MFC1`/`MFC2`/`Cell Pressure`, parsed into
 `LaserLog.environment` — carrier-gas stability for free, from a file already read.
 
-### 5.1 CRM library (`configs/crm/*.yaml`)
+### 5.1 CRM library (`icpms_qc/configs/crm/*.yaml`)
 
 Every other recovery check divides by `Sample.level` — one expected concentration for all
 analytes, which is the right shape for a spike from a single multi-element standard and the

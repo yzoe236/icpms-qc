@@ -28,7 +28,7 @@ from pathlib import Path
 
 import yaml
 
-_REPO_CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
+_REPO_CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 
 #: Mass-concentration units → factor to ppb. ppb is µg/L for liquids and µg/kg
 #: for solids; the two never appear in one certificate, so one table serves both.
