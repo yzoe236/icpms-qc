@@ -7,7 +7,8 @@ from icpqc.qc.checks import Outcome
 ALL_CHECKS = {
     "cal_linearity", "cal_back_calc", "cal_heteroscedasticity", "cal_low_std",
     "icv_recovery", "ccv_recovery", "ccv_frequency", "icb_ccb_blank",
-    "method_blank", "blank_derived_lod", "istd_recovery", "lcs_recovery",
+    "method_blank", "blank_derived_lod", "precision_rsd", "instrument_flags",
+    "istd_recovery", "lcs_recovery",
     "crm_recovery", "dup_rpd", "ms_msd", "serial_dilution",
     "laser_log_alignment", "seq_structure",
 }
@@ -17,6 +18,9 @@ ALL_CHECKS = {
 INAPPLICABLE = {
     "serial_dilution": "no serial dilution",
     "laser_log_alignment": "no laser log supplied",
+    # The reference layout carries no instrument-flag column, so the vendor's own
+    # verdict is unavailable — which must read differently from "it had none".
+    "instrument_flags": "maps no instrument-flag column",
 }
 
 

@@ -14,6 +14,7 @@ columns:
   level: "Level [ppb]"
 analyte_conc_pattern: '^(?P<label>.+?) Conc\. \[(?P<unit>[^\]]+)\]$'
 analyte_cps_pattern: '^(?P<label>.+?) CPS$'
+analyte_rsd_pattern: '^(?P<label>.+?) (?:CPS|Conc\.) RSD$'
 istd_cps_pattern: '^(?P<label>.+?) CPS \(ISTD\)$'
 sample_type_vocab:          # export string -> canonical SampleType
   CalBlk: CAL_BLANK

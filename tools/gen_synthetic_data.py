@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import random
 
 ANALYTES = ["9 Be", "52 Cr [He]", "60 Ni [He]", "63 Cu [He]",
@@ -52,7 +53,12 @@ def _row(rng, seq, name, stype, level, conc_by_analyte, istd_scale=1.0):
         # reference batch depicts a run whose reporting limit is defensible.
         measured = conc * _noise(rng) if conc > 0 else abs(rng.gauss(0.005, 0.003))
         row[f"{a} Conc. [ppb]"] = f"{measured:.4f}"
-        row[f"{a} CPS"] = f"{measured * SENS_CPS_PER_PPB * _noise(rng):.0f}"
+        cps = measured * SENS_CPS_PER_PPB * _noise(rng)
+        row[f"{a} CPS"] = f"{cps:.0f}"
+        # Counting statistics alone set a floor on precision: RSD ~ 100/sqrt(counts).
+        # Derived, not drawn, so both batches keep consuming an identical RNG stream —
+        # and a blank comes out genuinely imprecise, which is what gating is for.
+        row[f"{a} CPS RSD"] = f"{max(0.3, 100.0 / math.sqrt(max(cps, 1.0))):.2f}"
     for istd, base in ISTDS.items():
         row[f"{istd} CPS (ISTD)"] = f"{base * istd_scale * _noise(rng):.0f}"
     return row
@@ -129,6 +135,7 @@ def generate(path: str, violations: bool = False, seed: int = 42) -> int:
     fieldnames = (["Seq", "Sample Name", "Type", "Level [ppb]"]
                   + [f"{a} Conc. [ppb]" for a in ANALYTES]
                   + [f"{a} CPS" for a in ANALYTES]
+                  + [f"{a} CPS RSD" for a in ANALYTES]
                   + [f"{i} CPS (ISTD)" for i in ISTDS])
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)

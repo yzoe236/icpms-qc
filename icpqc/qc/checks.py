@@ -455,6 +455,134 @@ def blank_derived_lod(batch: Batch, params: dict) -> CheckResult:
                    warn_reason="no analyte had enough numeric blank results")
 
 
+def precision_rsd(batch: Batch, params: dict) -> CheckResult:
+    """Replicate precision (%RSD) of each measurement, per analyte.
+
+    Every other check in the catalog asks whether a number is *right*. This one
+    asks whether it is *repeatable*, which is a different failure and often the
+    only one a research batch actually has — a run can recover its standards
+    perfectly and still be unusable because the signal would not sit still.
+
+    Precision is meaningless near background: counting statistics alone put the
+    RSD of a blank in the hundreds of percent, and reporting that as a finding
+    would bury the real ones. Measurements below `min_intensity_cps` (or, when
+    intensities are not exported, below `min_conc_x_loq`) are recorded as not
+    assessed rather than failed.
+
+    One row per analyte, not per measurement: a wide export has thousands of
+    measurements and nobody reads that, whereas "Zn was noisy all run" is the
+    sentence an analyst acts on.
+    """
+    max_rsd = float(params.get("max_rsd_pct", 5.0))
+    min_cps = params.get("min_intensity_cps")
+    mult = float(params.get("min_conc_x_loq", 10))
+
+    have_rsd = any(r.rsd_pct is not None
+                   for s in batch.samples for r in s.results.values())
+    if not have_rsd:
+        return _ne("precision_rsd",
+                   "no %RSD columns in this export — add `analyte_rsd_pattern` to "
+                   "the template if the layout has them")
+
+    types = params.get("types")
+    wanted = None
+    if types:
+        wanted = {SampleType(str(t)) for t in types}
+
+    details: list[dict] = []
+    for a in batch.analytes:
+        assessed, over, worst, worst_sample, skipped = 0, 0, None, None, 0
+        for s in batch.samples:
+            if wanted and s.type not in wanted:
+                continue
+            r = s.results.get(a.label)
+            if r is None or r.rsd_pct is None:
+                continue
+            if min_cps is not None and r.intensity is not None:
+                too_low = r.intensity < float(min_cps)
+            elif r.conc is not None:
+                too_low = r.conc <= mult * _loq_for(a.label, params)
+            else:
+                too_low = r.conc is None and r.intensity is None
+            if too_low:
+                skipped += 1
+                continue
+            assessed += 1
+            if worst is None or r.rsd_pct > worst:
+                worst, worst_sample = r.rsd_pct, s.name
+            if r.rsd_pct > max_rsd:
+                over += 1
+        row = {"analyte": a.label, "n_assessed": assessed, "n_over": over,
+               "max_rsd_pct": None if worst is None else round(worst, 2),
+               "limit_pct": max_rsd, "ok": None if not assessed else over == 0}
+        if worst_sample and over:
+            row["worst_sample"] = worst_sample
+        if not assessed:
+            row["note"] = (f"all {skipped} measurement(s) below the assessment "
+                           f"threshold — precision not evaluated")
+        details.append(row)
+    return _finish("precision_rsd", details,
+                   warn_reason="no measurement was above the assessment threshold")
+
+
+def instrument_flags(batch: Batch, params: dict) -> CheckResult:
+    """What the instrument software itself objected to, carried into the report.
+
+    The vendor already judged this run and wrote its verdict into the export. A
+    tool that calls itself auditable and then silently drops that verdict is
+    hiding evidence — and where the two disagree, the disagreement is precisely
+    what a reviewer needs to see.
+
+    These are the vendor's thresholds, not the rule pack's, so by default they
+    are reported without deciding the batch. `on_flag: fail` makes them binding.
+    """
+    if not batch.flags_column_mapped:
+        return _ne("instrument_flags",
+                   "the template maps no instrument-flag column (`columns.flags`) — "
+                   "the export may carry one")
+    flagged = [s for s in batch.samples if s.instrument_flags or s.flags]
+    if not flagged:
+        return CheckResult("instrument_flags", Outcome.PASS,
+                           details=[{"samples_flagged": 0, "ok": True,
+                                     "note": "the instrument raised no QC objection "
+                                             "on any sample in this batch"}])
+
+    as_fail = str(params.get("on_flag", "warn")).lower() == "fail"
+    total = sum(len(s.instrument_flags) for s in flagged)
+    by_metric: dict[str, int] = {}
+    for s in flagged:
+        for f in s.instrument_flags:
+            by_metric[f.metric] = by_metric.get(f.metric, 0) + 1
+
+    details: list[dict] = [{
+        "samples_flagged": len(flagged), "objections": total,
+        "kinds": ", ".join(f"{k}×{n}" for k, n in sorted(by_metric.items())) or "-",
+        "ok": False if as_fail else None,
+        "note": "raised by the instrument software, not by this rule pack",
+    }]
+    limit = int(params.get("max_rows", 60))
+    shown = 0
+    for s in flagged:
+        for f in s.instrument_flags:
+            if shown >= limit:
+                break
+            details.append({"sample": s.name, "analyte": f.analyte,
+                            "metric": f.metric, "value": f.value, "limit": f.limit,
+                            "ok": False if as_fail else None})
+            shown += 1
+    if shown < total:
+        details.append({"ok": None, "note": f"… and {total - shown} more objection(s); "
+                                            f"see the export or raise `max_rows`"})
+    if as_fail:
+        return CheckResult("instrument_flags", Outcome.FAIL,
+                           reason=f"{total} objection(s) from the instrument software",
+                           details=details)
+    return CheckResult("instrument_flags", Outcome.WARN,
+                       reason=f"{total} objection(s) from the instrument software "
+                              f"across {len(flagged)} sample(s)",
+                       details=details)
+
+
 def istd_recovery(batch: Batch, params: dict) -> CheckResult:
     """ISTD intensity of every post-calibration sample vs the ICAL reference.
 
@@ -824,6 +952,8 @@ CATALOG = {
     "icb_ccb_blank": icb_ccb_blank,
     "method_blank": method_blank,
     "blank_derived_lod": blank_derived_lod,
+    "precision_rsd": precision_rsd,
+    "instrument_flags": instrument_flags,
     "istd_recovery": istd_recovery,
     "lcs_recovery": lcs_recovery,
     "crm_recovery": crm_recovery,

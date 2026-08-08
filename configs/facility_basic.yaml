@@ -25,6 +25,8 @@ checks:
   # The rinse/blank-verify reads after the curve are exactly the population this
   # estimate wants, and a facility run usually has plenty of them.
   blank_derived_lod: { enabled: true, params: { blank_types: [CCB, ICB], k_lod: 3, k_loq: 10, min_n: 3, on_exceed: warn }, verify: "facility SOP — how the reporting limit was set" }
+  precision_rsd:   { enabled: true,  params: { max_rsd_pct: 10.0, min_intensity_cps: 1000, min_conc_x_loq: 10 }, verify: "facility SOP — research batches tolerate more scatter than a compliance method" }
+  instrument_flags: { enabled: true, params: { on_flag: warn, max_rows: 60 },        verify: "instrument software QC settings" }
   istd_recovery:   { enabled: true,  params: { window_pct: [60, 130], reference: "ical" }, verify: "facility SOP" }
   lcs_recovery:    { enabled: false, params: {} }
   crm_recovery:    { enabled: true,  params: { library: crm, window_pct: [80, 120] },      verify: "certificate of analysis" }

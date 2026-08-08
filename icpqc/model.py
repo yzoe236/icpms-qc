@@ -83,6 +83,10 @@ class Result:
     #: The detection limit quoted alongside a censored result ("<0.05" -> 0.05).
     #: None when the export censored without a number ("ND").
     dl: float | None = None
+    #: Relative standard deviation of the replicate integrations, in percent —
+    #: the export's own precision figure for this measurement. Accuracy checks
+    #: cannot see it, and on a research batch it is often the only thing wrong.
+    rsd_pct: float | None = None
 
     @property
     def upper_bound(self) -> float | None:
@@ -95,6 +99,31 @@ class Result:
 
 
 @dataclass
+class InstrumentFlag:
+    """One QC objection raised by the instrument software itself.
+
+    The vendor already judged this run and wrote its verdict into the export. A
+    tool that calls itself auditable and then discards that verdict is hiding
+    evidence — so it is parsed, carried, and reported alongside icpqc's own.
+    """
+    analyte: str                  # label as the instrument wrote it
+    metric: str                   # e.g. "CPS RSD"
+    value: float | None = None
+    limit: float | None = None
+    #: "high" when the value exceeded a maximum, "low" when it fell under a
+    #: minimum. The instrument objects in both directions and the report must
+    #: not render a calibration R below 0.95 as though it were too large.
+    direction: str = "high"
+    text: str = ""                # the original sentence, kept verbatim
+
+    def describe(self) -> str:
+        if self.value is None or self.limit is None:
+            return f"{self.analyte}: {self.metric}"
+        sign = ">" if self.direction == "high" else "<"
+        return f"{self.analyte}: {self.metric} {self.value:g} {sign} {self.limit:g}"
+
+
+@dataclass
 class Sample:
     name: str
     seq_index: int
@@ -104,6 +133,8 @@ class Sample:
     results: dict[str, Result] = field(default_factory=dict)   # analyte label → Result
     istd_intensities: dict[str, float] = field(default_factory=dict)  # istd label → CPS
     flags: list[str] = field(default_factory=list)  # instrument-software QC flag text
+    #: `flags` parsed into structure where the wording allowed it
+    instrument_flags: list[InstrumentFlag] = field(default_factory=list)
 
 
 @dataclass
@@ -115,6 +146,10 @@ class Batch:
     istds: list[Analyte] = field(default_factory=list)
     samples: list[Sample] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    #: Did the template map a column carrying the instrument's own QC text?
+    #: "The instrument raised no objection" and "we never read its objections"
+    #: are both an empty list, and must never be reported as the same thing.
+    flags_column_mapped: bool = False
     #: Laser ablation log for this run, when one was supplied. The laser and the
     #: mass spectrometer keep separate clocks, so which counts belong to which
     #: ablation is a reconstruction — this is the record it can be audited against.

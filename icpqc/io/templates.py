@@ -40,6 +40,9 @@ class Template:
     columns: dict[str, str]
     analyte_conc_pattern: re.Pattern | None
     analyte_cps_pattern: re.Pattern | None
+    #: Precision columns ("... :: CPS RSD"). Matched *before* ignore_patterns, so
+    #: declaring it overrides an inherited 'RSD$' ignore rather than fighting it.
+    analyte_rsd_pattern: re.Pattern | None
     istd_cps_pattern: re.Pattern | None
     sample_type_vocab: dict[str, SampleType]
     parent_rules: list[ParentRule]
@@ -88,6 +91,7 @@ def load(name_or_path: str) -> Template:
         columns={str(k): str(v) for k, v in (data.get("columns") or {}).items()},
         analyte_conc_pattern=conc,
         analyte_cps_pattern=pat("analyte_cps_pattern"),
+        analyte_rsd_pattern=pat("analyte_rsd_pattern"),
         istd_cps_pattern=pat("istd_cps_pattern"),
         sample_type_vocab=vocab,
         parent_rules=rules,

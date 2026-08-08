@@ -16,6 +16,11 @@ level_is_index: true
 expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*ppb'
 analyte_cps_pattern: '^(?P<label>.+?)\s*::\s*CPS$'
 istd_label_pattern: 'ISTD'
+# Precision, kept rather than discarded: replicate %RSD is the one thing a
+# research batch most often fails on, and the accuracy checks cannot see it.
+# Matched before ignore_patterns, so the 'RSD$' rule below still covers any
+# RSD column this pattern does not claim.
+analyte_rsd_pattern: '^(?P<label>.+?)\s*::\s*(?:CPS|Conc\.)\s*RSD$'
 ignore_patterns:
   - 'RSD$'
   - '^Rjct$'

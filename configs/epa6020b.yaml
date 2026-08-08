@@ -26,6 +26,13 @@ checks:
   # the bare minimum for a standard deviation, NOT a defensible MDL study — the
   # 40 CFR 136 B procedure wants 7+ replicates. on_exceed: fail to enforce.
   blank_derived_lod: { enabled: true, params: { blank_types: [ICB, CCB], k_lod: 3, k_loq: 10, min_n: 3, on_exceed: warn }, verify: "40 CFR 136 App. B / lab MDL-LOQ procedure" }
+  # Repeatability of the replicate integrations. Accuracy checks cannot see this,
+  # and a run can recover every standard perfectly while the signal refuses to sit
+  # still. Gated on intensity: the %RSD of a blank is counting noise, not a finding.
+  precision_rsd:   { enabled: true, params: { max_rsd_pct: 5.0, min_intensity_cps: 1000, min_conc_x_loq: 10 }, verify: "lab SOP / method precision criteria — 5% is the instrument-software default, not a method limit" }
+  # The instrument already judged this run. Reported, not decisive: these are the
+  # vendor's thresholds, not this pack's. `on_flag: fail` makes them binding.
+  instrument_flags: { enabled: true, params: { on_flag: warn, max_rows: 60 },        verify: "instrument software QC settings — whoever configured them" }
   istd_recovery:   { enabled: true, params: { window_pct: [70, 130], reference: "ical" }, verify: "6020B internal standards — CONFIRM window vs current text (200.8 uses a different one)" }
   lcs_recovery:    { enabled: true, params: { window_pct: [80, 120] },                    verify: "6020B LCS acceptance (or lab control limits)" }
   # Certified reference materials, per certified element. Values come from

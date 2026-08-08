@@ -119,6 +119,20 @@ RPD · serial-dilution agreement · required-QC presence. Each check reports
 PASS / FAIL / WARN / NOT_EVALUATED — a check that can't run says so loudly, because
 silence is how QC reports lie.
 
+**Precision is a first-class check, not an afterthought.** A run can recover every
+standard perfectly and still be unusable because the signal would not sit still, and the
+accuracy checks cannot see that. `precision_rsd` reads the %RSD your export already
+carries — gated on signal level, because the RSD of a blank is counting noise rather than
+a finding. Validating against two real batches found icpqc silently reporting nothing
+while the instrument software itself had raised 1218 objections, all of them precision or
+calibration; that is the hole this closes.
+
+**The instrument's own verdict is carried, not discarded.** MassHunter writes its QC
+objections into the export. `instrument_flags` parses and reports them alongside icpqc's
+own conclusions — they are the vendor's thresholds, so they are reported rather than
+decisive (`on_flag: fail` makes them binding), and where the two disagree, that
+disagreement is exactly what a reviewer needs to see.
+
 Non-detects are treated as results, not as missing data. `<0.05` bounds the truth from
 above: a blank censored *below* its threshold passes on merit, one censored above it is
 reported as undecidable, and a standard that came back non-detect fails on its upper
@@ -177,7 +191,7 @@ packs (`configs/*.yaml`) parameterize with your method's limits.
 
 ## Status
 
-**v0.1 implemented**: reference-template parser, 18-check engine, CRM library, laser-log
+**v0.1 implemented**: reference-template parser, 20-check engine, CRM library, laser-log
 auditing, HTML + JSON reports, CLI — test suite green. Current phase: field-testing against real-world layouts.
 The single most useful contribution: a **redacted** export from your lab (fake sample
 names, real column layout) + the software version that produced it.

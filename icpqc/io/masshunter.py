@@ -12,7 +12,7 @@ import csv
 import re
 
 from icpqc.io import templates
-from icpqc.model import Analyte, Batch, Result, Sample, SampleType
+from icpqc.model import Analyte, Batch, InstrumentFlag, Result, Sample, SampleType
 
 # Analyte labels, every shape a MassHunter export writes them in:
 #   "9 Be"                 single quad, no cell gas
@@ -61,6 +61,80 @@ def _num(raw: str | None) -> float | None:
         return float(raw.replace(",", ""))
     except ValueError:
         return None
+
+
+# MassHunter objects in both directions, and a calibration R may be negative:
+#   "CPS RSD value = 12.10 is over the allowed maximum = 5.00"
+#   "Calibration Curve Fit R value = -0.286775 is below the allowed minimum = 0.950000"
+_FLAG_BODY = re.compile(
+    r"^\s*:?\s*(?P<metric>.*?)\s*value\s*=\s*(?P<value>[-+]?[\d.]+)\s+is\s+"
+    r"(?P<direction>over the allowed maximum|below the allowed minimum)"
+    r"\s*=\s*(?P<limit>[-+]?[\d.]+)\s*$")
+
+# A third wording states no numeric limit, because the bound is the calibration
+# itself: "Concentration value = 2202.42 is over the calibration range". That is
+# a reportability finding in its own right — the result is extrapolated past the
+# highest standard — so it must not be lumped in with unparsed text.
+_FLAG_RANGE = re.compile(
+    r"^\s*:?\s*(?P<metric>.*?)\s*value\s*=\s*(?P<value>[-+]?[\d.]+)\s+is\s+"
+    r"(?P<direction>over|below)\s+the\s+calibration\s+range\s*$")
+
+
+def parse_instrument_flags(text: str, analyte_labels: list[str]) -> list[InstrumentFlag]:
+    """Split MassHunter's QC warning blob into one flag per analyte.
+
+    The blob concatenates sentences with no delimiter, so a limit runs straight
+    into the next analyte's mass::
+
+        ... allowed maximum = 5.0066  Zn  [ No Gas ] :  CPS RSD value = 12.10 ...
+                              ^^^^ ^^
+                              5.00 and mass 66, with nothing between them
+
+    That split is genuinely ambiguous to a regex — 5.0066 could be 5.00 + 66,
+    5.006 + 6, or 5.0 + 066. It is not ambiguous to us: the batch header already
+    told us which analyte labels exist, so the blob is cut at those known
+    strings instead of guessed at.
+    """
+    if not text:
+        return []
+    marks: list[tuple[int, str]] = []
+    for label in analyte_labels:
+        start = 0
+        while (i := text.find(label, start)) != -1:
+            marks.append((i, label))
+            start = i + 1
+    marks.sort(key=lambda m: (m[0], -len(m[1])))
+
+    picked: list[tuple[int, str]] = []
+    for pos, label in marks:
+        if picked and pos < picked[-1][0] + len(picked[-1][1]):
+            continue                                  # overlaps the previous label
+        picked.append((pos, label))
+
+    out: list[InstrumentFlag] = []
+    for k, (pos, label) in enumerate(picked):
+        end = picked[k + 1][0] if k + 1 < len(picked) else len(text)
+        body = text[pos + len(label):end]
+        m = _FLAG_BODY.match(body)
+        if m:
+            out.append(InstrumentFlag(
+                analyte=label, metric=m.group("metric").strip(),
+                value=_num(m.group("value")), limit=_num(m.group("limit")),
+                direction="high" if "maximum" in m.group("direction") else "low",
+                text=(label + body).strip()))
+        elif (m := _FLAG_RANGE.match(body)):
+            out.append(InstrumentFlag(
+                analyte=label,
+                metric=f"{m.group('metric').strip()} outside calibration range",
+                value=_num(m.group("value")), limit=None,
+                direction="high" if m.group("direction") == "over" else "low",
+                text=(label + body).strip()))
+        else:
+            # Unrecognized wording still counts as an objection; carry it whole
+            # rather than dropping the vendor's verdict on a phrasing change.
+            out.append(InstrumentFlag(analyte=label, metric=body.strip(" :") or "flagged",
+                                      text=(label + body).strip()))
+    return out
 
 
 def _parse_conc(raw: str | None) -> tuple[float | None, bool, float | None]:
@@ -150,8 +224,16 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
     cps_cols: dict[str, str] = {}                # analyte label -> column
     istd_cols: dict[str, str] = {}               # istd label -> column (conc or cps)
 
+    rsd_cols: dict[str, str] = {}                # analyte label -> column
+
     for col in names:
         if col in fixed_cols:
+            continue
+        # Precision is matched before the ignore list: a template that declares
+        # analyte_rsd_pattern means it, and should not have to also unset an
+        # inherited 'RSD$' ignore rule.
+        if tpl.analyte_rsd_pattern and (m := tpl.analyte_rsd_pattern.match(col)):
+            rsd_cols[m.group("label").strip()] = col
             continue
         if any(p.search(col) for p in tpl.ignore_patterns):
             continue
@@ -184,6 +266,7 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
     level_col = tpl.columns.get("level")
     seq_col = tpl.columns.get("seq")
     flags_col = tpl.columns.get("flags")
+    batch.flags_column_mapped = bool(flags_col)
 
     unknown_types: set[str] = set()
     for i, row_vals in enumerate(data_rows):
@@ -227,6 +310,7 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
                 intensity=_num(row.get(cps_cols[label])) if label in cps_cols else None,
                 below_dl=below_dl,
                 dl=dl,
+                rsd_pct=_num(row.get(rsd_cols[label])) if label in rsd_cols else None,
             )
         for label, col in istd_cols.items():
             v = _num(row.get(col))
@@ -234,6 +318,7 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
                 sample.istd_intensities[label] = v
         if flags_col and (flag_text := (row.get(flags_col) or "").strip()):
             sample.flags.append(flag_text)
+            sample.instrument_flags = parse_instrument_flags(flag_text, analyte_labels)
 
         batch.samples.append(sample)
 

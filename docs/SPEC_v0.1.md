@@ -43,7 +43,8 @@ Batch:      instrument_family, exported_at?, analytes[], istds[], samples[]
 Analyte:    label, mass, element, mass_shift?, mode?    (e.g. 31 -> 47 P [O2])
 Sample:     name, seq_index, type, level?, results{analyte_label → Result}
 Result:     conc, unit, intensity?, istd_label?, istd_intensity?, flags[],
-            below_dl, dl?
+            below_dl, dl?, rsd_pct?
+Sample:     … flags[], instrument_flags[InstrumentFlag]
 SampleType: CAL_STD | CAL_BLANK | ICV | CCV | ICB | CCB | MB | LCS |
             SAMPLE | DUP | MS | MSD | SERIAL_DIL | POST_SPIKE | OTHER
 ```
@@ -65,6 +66,19 @@ below_dl = False`, which means nothing was reported at all. The distinction is l
 a blank censored below its threshold *passes*, a blank nobody measured is `NOT_EVALUATED`,
 and collapsing the two makes those two batches produce the same report.
 
+**Precision.** `rsd_pct` is the export's own repeatability figure for a measurement.
+Accuracy checks cannot see it, and a run can recover every standard perfectly while
+remaining unusable because the signal would not sit still — so the templates parse it
+rather than discarding it, and `precision_rsd` acts on it.
+
+**The instrument's own verdict.** MassHunter writes its QC objections into the export as
+free text. They are parsed into `Sample.instrument_flags` — the blob concatenates
+sentences with no delimiter (`= 5.00` runs straight into the next analyte's mass `66`), so
+it is cut at the *known analyte labels* from the header rather than guessed at by regex.
+`Batch.flags_column_mapped` separates "the instrument raised no objection" from "no column
+carrying its objections was mapped"; both are an empty list and they must never report the
+same way.
+
 ## 4. QC check catalog (v0.1)
 
 Every check: `id`, inputs, pass condition, method reference. **All numeric defaults below
@@ -83,6 +97,8 @@ packs — confirm against the current method text before compliance use.**
 | `icb_ccb_blank` | cal blanks below reporting threshold | |conc| < LOQ (configurable: MDL / ½LOQ) |
 | `method_blank` | MB below reporting threshold | < LOQ |
 | `blank_derived_lod` | LOD/LOQ implied by post-cal blank scatter, vs the configured LOQ | 3σ / 10σ, ≥3 blanks, warn on exceed |
+| `precision_rsd` | replicate %RSD per analyte, gated on signal level | ≤ 5% (pack), not assessed below the gate |
+| `instrument_flags` | the instrument software's own QC objections, carried into the report | reported; `on_flag: fail` to bind |
 | `istd_recovery` | ISTD intensity vs reference (ICAL std/blank) | 200.8-pack: 60–125% · 6020B-pack: 70–130% (**verify**) |
 | `lcs_recovery` | lab control sample | 80–120% |
 | `crm_recovery` | certified reference material, per certified element | 80–120% vs `configs/crm/*.yaml` |
