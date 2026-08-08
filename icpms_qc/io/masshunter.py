@@ -8,6 +8,7 @@ Batch.warning — loud, never guessed (SPEC §3).
 """
 from __future__ import annotations
 
+import codecs
 import csv
 import re
 
@@ -32,6 +33,7 @@ _LABEL_RE = re.compile(
 )
 
 _WS = re.compile(r"\s+")
+_UNNAMED = re.compile(r"^Unnamed:\s*\d+$")
 
 #: exact strings an export uses for "measured, not detected" (no limit quoted)
 _NON_DETECT = {"nd", "n.d.", "n.d", "<dl", "<mdl", "<loq", "<lod"}
@@ -176,10 +178,24 @@ def _analyte_from_label(label: str) -> Analyte:
 
 
 def _read_raw(path: str, encoding: str) -> tuple[list[list[str]], str | None]:
-    """Read all CSV rows; fall back to cp1252 (real MassHunter exports are ANSI)."""
+    """Read all CSV rows, honouring a byte-order mark over the declared encoding.
+
+    A template that says cp1252 and a file that is UTF-8-with-BOM is the quiet
+    failure here: cp1252 maps almost every byte, so nothing raises — the BOM just
+    decodes to "ï»¿" and glues itself to the first header cell. The sample-info
+    block then matches nothing and the whole run reports empty. Sniffing three
+    bytes costs nothing and removes the failure mode entirely.
+    """
+    note = None
+    with open(path, "rb") as fh:
+        if fh.read(len(codecs.BOM_UTF8)) == codecs.BOM_UTF8:
+            if encoding.replace("_", "-").lower() not in {"utf-8-sig", "utf8-sig"}:
+                note = (f"file carries a UTF-8 BOM; read as utf-8-sig rather than the "
+                        f"template's '{encoding}'")
+            encoding = "utf-8-sig"
     try:
         with open(path, newline="", encoding=encoding) as fh:
-            return list(csv.reader(fh)), None
+            return list(csv.reader(fh)), note
     except UnicodeDecodeError:
         with open(path, newline="", encoding="cp1252") as fh:
             return (list(csv.reader(fh)),
@@ -196,6 +212,10 @@ def _logical_header(raw: list[list[str]], tpl: templates.Template) -> tuple[list
     for i in range(width):
         lab = (h1[i] if i < len(h1) else "").strip()
         sub = (h2[i] if i < len(h2) else "").strip()
+        # A file round-tripped through pandas writes "Unnamed: 4" where the export
+        # left the cell blank. Blank is what it means.
+        if _UNNAMED.match(lab):
+            lab = ""
         if lab:
             cur = lab
         if not sub:

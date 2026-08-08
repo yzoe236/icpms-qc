@@ -24,6 +24,7 @@ analyte_rsd_pattern: '^(?P<label>.+?)\s*::\s*(?:CPS|Conc\.)\s*RSD$'
 ignore_patterns:
   - 'RSD$'
   - '^Rjct$'
+  - '^Data File$'
   - '^Acq\. Date-Time$'
   - '^Comment$'
   - '^Vial Number$'

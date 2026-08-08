@@ -42,3 +42,37 @@ def test_two_row_ansi_encoding_fallback(tmp_path):
     p.write_bytes(text.encode("cp1252"))
     batch = masshunter.parse(str(p), template="masshunter_conc_2row")
     assert len(batch.samples) == 5                    # cp1252 curly quotes handled
+
+
+# ── regressions found by sweeping 165 real exports (2026-08-08) ──────────────
+
+def test_utf8_bom_wins_over_the_templates_declared_encoding(tmp_path, pass_csv):
+    """cp1252 decodes a BOM without raising, gluing 'ï»¿' to the first header.
+
+    The whole sample-info block then matches nothing and the run reports empty —
+    silently. One real export in the corpus was in exactly this state.
+    """
+    import csv as _csv
+    from icpms_qc.io import masshunter
+
+    rows = list(_csv.reader(open(pass_csv, newline="", encoding="utf-8")))
+    src = tmp_path / "bom.csv"
+    with open(src, "w", newline="", encoding="utf-8-sig") as fh:   # BOM written
+        _csv.writer(fh).writerows(rows)
+
+    raw, note = masshunter._read_raw(str(src), "cp1252")           # template lies
+    assert raw[0][0] == "Seq"                                      # not "ï»¿Seq"
+    assert note and "UTF-8 BOM" in note                            # and it says so
+
+
+def test_pandas_unnamed_placeholders_read_as_blank():
+    """A file round-tripped through pandas writes 'Unnamed: 4' for a blank cell."""
+    from icpms_qc.io import masshunter, templates
+
+    tpl = templates.load("masshunter_counts_2row")
+    raw = [["Sample", "Unnamed: 1", "Unnamed: 2", "9  Be  [ No Gas ]", ""],
+           ["", "Rjct", "Sample Name", "CPS", "CPS RSD"],
+           ["", "False", "blank", "12", "3.1"]]
+    names, body = masshunter._logical_header(raw, tpl)
+    assert "Sample Name" in names          # not "Unnamed: 2 :: Sample Name"
+    assert "Rjct" in names
