@@ -21,7 +21,7 @@ def test_pass_batch_exits_zero(pass_csv, tmp_path):
     data = json.loads((out / "qc_report.json").read_text(encoding="utf-8"))
     assert data["schema_version"] == "0.1"
     assert data["verdict"] == "PASS"
-    assert len(data["checks"]) == 21
+    assert len(data["checks"]) == 20
     html = (out / "qc_report.html").read_text(encoding="utf-8")
     assert "icpms-qc QC report" in html and "ccv_recovery" in html
 

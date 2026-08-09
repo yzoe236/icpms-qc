@@ -106,7 +106,6 @@ packs — confirm against the current method text before compliance use.**
 | `dup_rpd` | duplicate relative percent difference | ≤ 20% (when both > 5×LOQ) |
 | `ms_msd` | matrix spike / spike dup recovery + RPD | 75–125%, RPD ≤ 20% |
 | `serial_dilution` | 5× dilution agreement (conc sufficiently above LOQ) | within ±10% |
-| `laser_log_alignment` | LA-ICP-MS: laser log vs reduced results — same run? | counts + names agree; granularity `auto` |
 | `seq_structure` | required QC types present (ICV/ICB after cal, MB, LCS per batch) | pack-defined |
 
 Per-check outcome: `PASS / FAIL / WARN / NOT_EVALUATED(reason)` — a check that can't run
@@ -126,40 +125,6 @@ Two checks are worth calling out as different in kind:
 - `crm_recovery` is the only check whose expected values do not come from the export, for
   the reason in §5.1.
 
-### 4.1 Second input: the laser log (LA-ICP-MS)
-
-`icpms-qc check results.csv --laser-log LaserLog.csv`
-
-The laser and the mass spectrometer are two instruments with two clocks, started by
-two computers. The laser log knows *when it fired and where*; the ICP data knows
-*what it counted*. Nothing in either file states which counts belong to which
-ablation — that correspondence is reconstructed downstream, and when it is
-reconstructed wrongly every number after it is wrong while the report stays green.
-
-**icpms-qc does not perform the alignment.** Segmenting a transient signal is
-reduction (SPEC §1 non-goals) and the tools that do it — pewpew/pewlib, Ilaps,
-iolite, laserTRAM — do it well. What none of them does is *audit* the outcome.
-`icpms_qc.io.laserlog` parses the laser's own record into `Batch.laser_log` so
-`laser_log_alignment` can compare it against the reduced results.
-
-**Granularity is the crux and must not be assumed.** One log *sequence* is one
-pattern, carrying the sample name; inside it are the individual *ablations* (lines
-or spots). Whether a reduced row corresponds to a sequence or to an ablation is a
-property of the workflow, not of the file. `granularity: auto` resolves it by
-whichever count matches — and when neither matches, that is reported as the
-finding, with both numbers, rather than settled by picking the closer one.
-
-What the check can establish without touching a single count:
-
-- **count agreement** — patterns fired vs rows reported; a lost trigger or a
-  dropped sequence shows up here and nowhere else
-- **position-by-position name agreement** — the cheapest off-by-one detector
-  there is, and the one that catches a bracketing standard landing on the wrong row
-- **ablation duration consistency** — a shot much shorter than its neighbours is
-  an aborted ablation whose result rests on less signal than everything around it
-
-The log also carries timestamped `MFC1`/`MFC2`/`Cell Pressure`, parsed into
-`LaserLog.environment` — carrier-gas stability for free, from a file already read.
 
 ### 5.1 CRM library (`icpms_qc/configs/crm/*.yaml`)
 

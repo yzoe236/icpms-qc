@@ -18,46 +18,18 @@ from icpms_qc.qc import engine
 from icpms_qc.report import render
 
 
-def _load_batch(args):
-    """Pick a reader from what the path actually is, not from a flag.
-
-    A Thermo Element run is a *folder* of per-sample exports rather than one
-    file, so a directory is as valid an input here as a CSV.
-    """
-    from pathlib import Path as _P
-    from icpms_qc.io import element
-
-    target = _P(args.export_csv)
-    if target.is_dir():
-        return element.parse_folder(str(target), template=args.element_template)
-    if target.suffix.lower() == ".asc":
-        if element.looks_like_element_ascii(str(target)):
-            try:
-                return element.parse(str(target), template=args.element_template)
-            except ValueError:
-                sample, analytes, _ = element.parse_sample_file(
-                    str(target), template=args.element_template)
-                from icpms_qc.model import Batch
-                b = Batch(source_path=str(target), template_id=args.element_template,
-                          instrument_family="thermo-element")
-                b.samples, b.analytes, b.flags_column_mapped = [sample], analytes, True
-                return b
-        raise ValueError(f"{target}: not an Element ASCII export")
-    return masshunter.parse(args.export_csv, template=args.template)
-
-
 def _cmd_check(args) -> int:
     try:
-        batch = _load_batch(args)
+        from icpms_qc.io import detect as _detect
+        if args.template or args.counts:
+            batch = masshunter.parse(args.export_csv, template=args.template
+                                     or "masshunter_quant_wide")
+            found = None
+        else:
+            found = _detect.detect(args.export_csv)
+            batch = found.batch
         if args.counts:
             masshunter.attach_intensities(batch, args.counts, template=args.counts_template)
-        if args.laser_log:
-            from icpms_qc.io import laserlog
-            if not laserlog.looks_like_laser_log(args.laser_log):
-                print(f"icpms-qc: error: {args.laser_log} does not look like a laser log "
-                      f"(no 'Timestamp'/'Laser State' columns)", file=sys.stderr)
-                return 1
-            batch.laser_log = laserlog.parse(args.laser_log)
         results = engine.run(batch, rules=args.rules)
         html_path, json_path = render.write(batch, results, out_dir=args.out)
     except (OSError, ValueError) as exc:
@@ -65,6 +37,8 @@ def _cmd_check(args) -> int:
         return 1
 
     verdict = engine.verdict(results)
+    if found is not None:
+        print(f"  read as: {found.describe()}")
     print(f"icpms-qc {verdict}: {args.export_csv}")
     for r in results:
         line = f"  [{r.outcome.value:>13}] {r.check_id}"
@@ -75,6 +49,11 @@ def _cmd_check(args) -> int:
         print(f"  warning: {w}")
     print(f"  report: {html_path}")
     print(f"  json:   {json_path}")
+    if batch.warnings:
+        # The moment someone is most likely to help is the moment it let them
+        # down, so ask then rather than in a README they may never open.
+        print("\n  Something it could not read? Send a redacted export to "
+              "llh9389@gmail.com and it will read yours next time.")
     return 0 if verdict == "PASS" else 2
 
 
@@ -166,8 +145,8 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="run QC checks on a batch export")
     check.add_argument("export_csv")
     check.add_argument("--rules", default="epa6020b", help="rule pack name or path to YAML")
-    check.add_argument("--template", default="masshunter_quant_wide",
-                       help="export-layout template name or path to YAML")
+    check.add_argument("--template", default=None,
+                       help="force a layout template (default: detect it)")
     check.add_argument("--out", default="out", help="output directory for reports")
     check.add_argument("--element-template", dest="element_template",
                        default="element_ascii",
@@ -179,10 +158,6 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--counts-template", dest="counts_template",
                        default="masshunter_counts_2row",
                        help="layout template for the --counts file")
-    check.add_argument("--laser-log", dest="laser_log",
-                       help="laser ablation log CSV (iolite/NWL style) — enables "
-                            "laser_log_alignment, which audits whether the results "
-                            "and the laser's own record describe the same run")
 
     insp = sub.add_parser("inspect", help="print the layout fingerprint of an export")
     insp.add_argument("export_csv")

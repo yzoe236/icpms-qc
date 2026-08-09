@@ -1011,115 +1011,6 @@ def serial_dilution(batch: Batch, params: dict) -> CheckResult:
                    warn_reason="serial dilution present but parent below assessment threshold")
 
 
-def _norm_name(s: str) -> str:
-    """Fold the cosmetic differences between a laser comment and a sample name."""
-    return re.sub(r"[\s_\-.]+", "", s or "").casefold()
-
-
-def laser_log_alignment(batch: Batch, params: dict) -> CheckResult:
-    """Do the laser's own record and the reduced results describe the same run?
-
-    The laser and the mass spectrometer keep separate clocks started by separate
-    computers, so the correspondence between ablations and results is always a
-    reconstruction. When it slips — a missed trigger, a dropped sequence, an
-    off-by-one — every concentration downstream is attributed to the wrong spot
-    and nothing complains. This check is the complaint.
-
-    icpms-qc does not do the alignment (that is reduction, and pewpew/Ilaps/iolite/
-    laserTRAM already do it). It only asks whether the answer survives comparison
-    with the laser log.
-
-    **Granularity** is the crux and cannot be assumed: one log *sequence* is one
-    pattern, and depending on the workflow a reduced row is either one pattern (a
-    raster image) or one *ablation* inside it (a spot). `granularity: auto`
-    settles it by whichever count matches — and when neither does, that failure to
-    match is itself the finding, reported with both numbers rather than resolved
-    by picking the closer one.
-    """
-    log = batch.laser_log
-    if log is None:
-        return _ne("laser_log_alignment",
-                   "no laser log supplied (pass --laser-log <LaserLog.csv>)")
-    if not log.ablations:
-        return _ne("laser_log_alignment",
-                   "laser log contains no ablations (no State=On rows)")
-
-    n_samples = len(batch.samples)
-    n_seq, n_abl = len(log.sequences), len(log.ablations)
-    wanted = str(params.get("granularity", "auto")).lower()
-
-    if wanted == "auto":
-        if n_samples == n_seq:
-            granularity, units = "sequence", log.sequences
-        elif n_samples == n_abl:
-            granularity, units = "ablation", log.ablations
-        else:
-            return CheckResult(
-                "laser_log_alignment", Outcome.FAIL,
-                reason=(f"{n_samples} result row(s) match neither the log's "
-                        f"{n_seq} sequence(s) nor its {n_abl} ablation(s)"),
-                details=[{"granularity": "auto", "result_rows": n_samples,
-                          "log_sequences": n_seq, "log_ablations": n_abl,
-                          "ok": False,
-                          "note": "the run and the results disagree on how many "
-                                  "things were measured — resolve this before "
-                                  "trusting any number in the batch"}])
-    elif wanted == "sequence":
-        granularity, units = "sequence", log.sequences
-    elif wanted == "ablation":
-        granularity, units = "ablation", log.ablations
-    else:
-        return _ne("laser_log_alignment",
-                   f"unknown granularity {wanted!r} (use auto, sequence or ablation)")
-
-    details: list[dict] = [{
-        "granularity": granularity, "result_rows": n_samples,
-        "log_sequences": n_seq, "log_ablations": n_abl,
-        "ok": len(units) == n_samples,
-        "note": (f"counts agree at {granularity} granularity"
-                 if len(units) == n_samples
-                 else f"{len(units)} log {granularity}(s) vs {n_samples} result row(s)"),
-    }]
-
-    # Name agreement, position by position: the cheapest off-by-one detector there
-    # is, and it needs no timing data at all.
-    if params.get("require_name_match", True):
-        for i, (unit, sample) in enumerate(zip(units, batch.samples), start=1):
-            log_name = unit.comment
-            if not log_name:
-                continue
-            a, b = _norm_name(log_name), _norm_name(sample.name)
-            ok = bool(a) and (a == b or a in b or b in a)
-            if not ok:
-                details.append({"position": i, "log_comment": log_name,
-                                "result_sample": sample.name, "ok": False,
-                                "note": "laser log and results disagree at this "
-                                        "position — suspect a shifted assignment"})
-
-    # An ablation much shorter than its neighbours is an aborted shot; the reduced
-    # result for it exists but rests on less signal than everything around it.
-    tol = float(params.get("max_duration_dev_pct", 25))
-    durations = [a.duration_s for a in log.ablations if a.duration_s]
-    if len(durations) >= 3:
-        median = sorted(durations)[len(durations) // 2]
-        if median > 0:
-            odd = [a for a in log.ablations if a.duration_s
-                   and abs(a.duration_s - median) / median * 100 > tol]
-            details.append({
-                "ablations": len(durations), "median_duration_s": round(median, 3),
-                "tolerance_pct": tol, "outliers": len(odd),
-                "ok": None if odd else True,
-                **({"note": "ablation(s) whose firing time deviates from the run: #"
-                            + ", #".join(str(a.index) for a in odd[:8])
-                            + (" …" if len(odd) > 8 else "")} if odd else {}),
-            })
-
-    for w in log.warnings:
-        details.append({"ok": None, "note": f"laser log: {w}"})
-
-    return _finish("laser_log_alignment", details)
-
-
 def seq_structure(batch: Batch, params: dict) -> CheckResult:
     """Required QC sample types are present in the batch."""
     required = [str(t) for t in params.get("require", [])]
@@ -1152,6 +1043,5 @@ CATALOG = {
     "dup_rpd": dup_rpd,
     "ms_msd": ms_msd,
     "serial_dilution": serial_dilution,
-    "laser_log_alignment": laser_log_alignment,
     "seq_structure": seq_structure,
 }

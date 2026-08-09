@@ -45,7 +45,4 @@ checks:
   dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "6020B duplicate criteria" }
   ms_msd:          { enabled: true, params: { window_pct: [75, 125], max_rpd_pct: 20 },   verify: "6020B matrix spike criteria" }
   serial_dilution: { enabled: true, params: { factor: 5, agreement_pct: 10, min_conc_x_loq: 50 }, verify: "6020B serial dilution test" }
-  # Audits the laser-vs-ICP correspondence when a laser log is supplied
-  # (--laser-log). NOT_EVALUATED without one, which is the solution-mode norm.
-  laser_log_alignment: { enabled: true, params: { granularity: auto, require_name_match: true, max_duration_dev_pct: 25 }, verify: "LA-ICP-MS: laser log vs reduced results — sequence/ablation granularity is workflow-specific" }
   seq_structure:   { enabled: true, params: { require: [ICV, ICB, MB, LCS] },             verify: "lab SOP / method QC section" }

@@ -309,22 +309,6 @@ Sample types come from `Analysis Type`; only when that is missing does it fall
 back to the name patterns in `element_ascii.template.yaml`, which you should
 adjust to your own sequence naming.
 
-## 10. Laser ablation runs
-
-If you have a laser log, pass it and icpms-qc will audit whether the results and the
-laser's own record describe the same run — patterns fired vs rows reported, names
-position by position, ablation durations:
-
-```bash
-icpms-qc check reduced_results.csv --laser-log LaserLog.csv
-```
-
-icpms-qc does not perform the alignment (that's reduction, and pewpew/Ilaps/iolite/
-laserTRAM already do it). It only checks whether the answer survives comparison.
-Without `--laser-log` the check reports `NOT_EVALUATED`, which is the normal state
-for solution-mode work.
-
----
 
 ## Getting stuck
 

@@ -10,14 +10,13 @@ ALL_CHECKS = {
     "method_blank", "blank_derived_lod", "precision_rsd", "instrument_flags",
     "istd_recovery", "lcs_recovery",
     "quant_crosscheck", "crm_recovery", "dup_rpd", "ms_msd", "serial_dilution",
-    "laser_log_alignment", "seq_structure",
+    "seq_structure",
 }
 
 #: Checks with nothing to work on in a synthetic solution batch. Each must say so
 #: out loud — a NOT_EVALUATED here is the correct answer, a PASS would be a lie.
 INAPPLICABLE = {
     "serial_dilution": "no serial dilution",
-    "laser_log_alignment": "no laser log supplied",
     # The reference layout carries no instrument-flag column, so the vendor's own
     # verdict is unavailable — which must read differently from "it had none".
     "instrument_flags": "maps no instrument-flag column",

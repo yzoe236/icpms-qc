@@ -1,34 +1,61 @@
 # icpms-qc — the QC check machine for ICP-MS batches
 
-**Post-run QC review for ICP-MS batch exports.**
+**Point it at your batch export. Get back a report that says whether the data can be
+reported, and why.**
+
+```bash
+pip install .
+icpms-qc check my_batch.csv
+```
+
+That is the whole thing. No template to choose, no options to learn — it works out what
+your file is, reads it, and writes `out/qc_report.html` for you and `out/qc_report.json`
+for your scripts.
+
+```
+  read as: masshunter · masshunter_conc_2row · paired with Count_12052024.csv
+icpms-qc FAIL: Conc_12052024.csv
+  [         PASS] cal_linearity
+  [         FAIL] precision_rsd   - 76 failing row(s)
+  [         WARN] instrument_flags - 1128 objection(s) from the instrument software
+  [NOT_EVALUATED] ccv_recovery    - no CCV samples in batch
+  report: out/qc_report.html
+```
+
+Exit code 0 = everything passed, 2 = QC failures, 1 = error. Drop it in a cron job.
+
+## Why
 
 Your instrument software will tell you the CCV recovered at 87%. It will not tell you
-whether the batch is usable, which samples the failure reaches, or what you should check
-first. **Instruments produce numbers. They do not produce assurance.** Somebody has to look
-at the run and say "I've reviewed this, it can be reported" — and in most labs that
+whether the batch is usable, which samples the failure reaches, or what to check first.
+**Instruments produce numbers. They do not produce assurance.** Somebody has to look at
+the run and say "I have reviewed this, it can be reported" — and in most labs that
 somebody is one experienced person, one batch at a time.
 
-icpms-qc automates the reviewable part of that: point it at a batch export and get every QC
-criterion evaluated, with the numbers behind each verdict, in a report you can hand to
-someone else — driven by versioned, editable rule packs (EPA 6020B-style, EPA 200.8-style,
-or your lab's own SOP).
+icpms-qc automates the reviewable part: 20 QC criteria evaluated, with the numbers behind
+every verdict, in a report you can hand to someone else.
 
-> Reads **Agilent ICP-MS MassHunter batch exports** — single-quad (7700/7800/7900) and
-> triple-quad MS/MS labels (`31 -> 47 P [O2]`, 8800/8900) alike, including
-> collision/reaction cell modes — and **Thermo Element 2 / Element XR ASCII exports**
-> (`.ASC`), both the multi-sample summary and the per-sample form, where a run is a
-> folder rather than a file:
->
-> ```bash
-> icpms-qc check /path/to/element/run_folder --rules facility_basic
-> ```
->
-> Thermo Qtegra and PerkinElmer Syngistix are still on the roadmap — want them sooner?
-> Open an issue with a redacted sample export.
->
-> This project is not affiliated with or endorsed by any instrument vendor. MassHunter is a
-> trademark of Agilent Technologies. Method rule packs ship with *typical default* limits —
-> **verify every threshold against the current text of your method before compliance use.**
+## What it reads
+
+| | |
+|---|---|
+| **Agilent MassHunter** | batch exports (CSV), single-quad 7700/7800/7900 and triple-quad MS/MS (`31 -> 47 P [O2]`, 8800/8900), collision and reaction cell modes |
+| **Thermo Element 2 / XR** | ASCII exports (`.ASC`) — point it at the **run folder**, since the Element writes a file per sample |
+| **Count + Conc pairs** | `Conc_0816.csv` with `Count_0816.csv` beside it is paired automatically |
+
+Tested against **165 real MassHunter exports and 212 real Element files** — 99%+ read
+without being told anything about them. Thermo Qtegra and PerkinElmer Syngistix are on
+the roadmap.
+
+## Something not working?
+
+**Email me: [llh9389@gmail.com](mailto:llh9389@gmail.com)** — or
+[open an issue](https://github.com/yzoe236/icpms-qc/issues).
+
+If it misread your export, or missed something it should have caught, I want to know.
+Send a **redacted** export — fake sample names, real column structure, plus your software
+version — and I will make it read yours. Every layout somebody sends is one more lab this
+works for out of the box, and it is genuinely the most useful thing you can contribute.
 
 ## Who this is for (and who it isn't)
 
@@ -166,28 +193,6 @@ reported as undecidable, and a standard that came back non-detect fails on its u
 bound. Reading `<0.05` as "no value" makes a clean blank and an unmeasured blank produce
 the same report.
 
-### Laser ablation: auditing the two clocks
-
-```bash
-icpms-qc check reduced_results.csv --laser-log LaserLog.csv
-```
-
-The laser and the mass spectrometer are two instruments with two clocks, started by
-two computers. Which counts belong to which ablation is always a *reconstruction* —
-and when it slips (a lost trigger, a dropped sequence, an off-by-one), every
-concentration after the slip is attributed to the wrong spot and nothing complains.
-
-icpms-qc does not do the alignment — that is reduction, and
-[pewpew](https://github.com/djdt/pewpew), [Ilaps](https://github.com/nikadilli/Ilaps-v2),
-iolite and [laserTRAM](https://github.com/jlubbersgeo/laserTRAM-DB) already do it.
-icpms-qc **audits** it: patterns fired vs rows reported, sample names position by
-position, ablation durations against the run. That comparison needs no raw signal
-at all, and today nothing else performs it.
-
-**Granularity is not assumed.** One log sequence is one pattern; inside it are the
-individual spots or lines. Which one a reduced row corresponds to depends on the
-workflow, so `granularity: auto` settles it by whichever count matches — and if
-neither matches, *that* is the finding, reported with both numbers.
 
 ### Reference materials
 
@@ -218,8 +223,8 @@ packs (`icpms_qc/configs/*.yaml`) parameterize with your method's limits.
 
 ## Status
 
-**v0.1 implemented**: reference-template parser, 21-check engine, CRM library, laser-log
-auditing, HTML + JSON reports, CLI — test suite green. Current phase: field-testing against real-world layouts.
+**v0.1 implemented**: auto-detecting parser (MassHunter + Thermo Element), 20-check
+engine, CRM library, HTML + JSON reports, CLI — 131 tests green.
 The single most useful contribution: a **redacted** export from your lab (fake sample
 names, real column layout) + the software version that produced it.
 

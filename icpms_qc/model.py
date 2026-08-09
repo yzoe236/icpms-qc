@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:                      # keeps the model free of io/ at runtime
-    from icpms_qc.io.laserlog import LaserLog
 
 
 class SampleType(str, Enum):
@@ -154,10 +150,6 @@ class Batch:
     #: "The instrument raised no objection" and "we never read its objections"
     #: are both an empty list, and must never be reported as the same thing.
     flags_column_mapped: bool = False
-    #: Laser ablation log for this run, when one was supplied. The laser and the
-    #: mass spectrometer keep separate clocks, so which counts belong to which
-    #: ablation is a reconstruction — this is the record it can be audited against.
-    laser_log: "LaserLog | None" = None
 
     def of_type(self, *types: SampleType) -> list[Sample]:
         return [s for s in self.samples if s.type in types]
