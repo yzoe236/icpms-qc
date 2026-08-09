@@ -78,6 +78,7 @@ Shipped templates:
 | `masshunter_quant_wide` | one header row, `9 Be Conc. [ppb]` style columns |
 | `masshunter_conc_2row` | two header rows (analyte labels above `Conc.`/`RSD` sub-headers), cp1252, Level column holds an index |
 | `masshunter_counts_2row` | as above, raw counts rather than concentrations |
+| `element_ascii` | Thermo Element 2 / XR `.ASC` — see §9, it is not a CSV layout |
 
 ### 3b. Look at what you actually have
 
@@ -161,10 +162,17 @@ what automation and agents should read, not the HTML.
 
 The shipped packs are **typical defaults, not method text**. Copy one and edit:
 
+The shipped packs live *inside* the installed package, so copy one **out** to
+somewhere you control — a reinstall would overwrite anything edited in place, and
+the whole point is that your pack lives in your git:
+
 ```bash
-cp icpms_qc/configs/epa6020b.yaml icpms_qc/configs/mylab.yaml
-icpms-qc check my_batch.csv --rules icpms_qc/configs/mylab.yaml
+python -c "import icpms_qc,shutil,pathlib; shutil.copy(
+  pathlib.Path(icpms_qc.__file__).parent/'configs'/'epa6020b.yaml', 'mylab.yaml')"
+icpms-qc check my_batch.csv --rules ./mylab.yaml
 ```
+
+`--rules` takes a path as happily as a name.
 
 A pack entry looks like:
 
@@ -219,11 +227,40 @@ are shown but cannot fail anyone's batch.
 Six skeletons for the geological glasses (NIST SRM 610/612, BCR-2G, BHVO-2G,
 BIR-1G, GSD-1G) ship as `*.yaml.example` with every value empty — fill in the
 ones you measure and rename to `.yaml`. See
-[`icpms_qc/configs/crm/README.md`](../configs/crm/README.md).
+[`icpms_qc/configs/crm/README.md`](../icpms_qc/configs/crm/README.md).
 
 ---
 
-## 7. Automation
+## 7. Counts and concentrations in two files
+
+MassHunter's report templates emit concentrations **or** counts, not both, so a
+lab that wants both exports the batch twice — `Count_0816.csv` beside
+`Conc_0816.csv`. Pass the companion and they are paired by sequence:
+
+```bash
+icpms-qc check Conc_0816.csv --counts Count_0816.csv --template masshunter_conc_2row
+```
+
+Merging them unlocks two checks that need signal and result together:
+
+- **`precision_rsd`** — replicate %RSD per analyte, gated on signal level, because
+  the RSD of a blank is counting noise rather than a finding.
+- **`quant_crosscheck`** — rebuilds the calibration from the standards in the file
+  and predicts each sample from its own counts.
+
+`quant_crosscheck` reports one thing only, and the restraint is deliberate. An
+export does not carry the regression weighting, the curve type, the excluded
+standards or the interference-correction equations, so individual samples differ
+for reasons that say nothing about correctness. What survives all of that is a
+*ratio*: when **several analytes are out by the same factor**, something scaled
+the sample — a dilution, a unit, the wrong calibration. One analyte alone at a
+constant offset is per-mass arithmetic (an interference correction, typically),
+and is shown rather than blamed.
+
+Samples are matched by position when both files list the same sequence, and by
+name otherwise; an ambiguous or missing name is reported, never guessed.
+
+## 8. Automation
 
 ```bash
 icpms-qc check batch.csv --rules mylab --out reports/$(date +%F)
@@ -244,7 +281,35 @@ d["batch"]["warnings"]                          # anything the parser could not 
 
 ---
 
-## 8. Laser ablation runs
+## 9. Thermo Element 2 / Element XR
+
+The Element writes `.ASC`, not CSV, and it writes the transpose of a MassHunter
+export: one isotope per row, one block of columns per sample. It also writes two
+different shapes, both of which turn up in the same run folder — a multi-sample
+summary table, and one file per acquisition. **A run is therefore a folder**, and
+a folder is a valid input:
+
+```bash
+icpms-qc check /path/to/element/run_folder --rules facility_basic
+```
+
+Files are ordered by the analysis timestamp each one carries rather than by
+filename, because that is the sequence the samples were measured in — and the
+frequency and drift checks reason about sequence.
+
+Isotopes read element-first (`Na23(LR)`, not `23 Na [He]`). The parenthesised
+`LR`/`MR`/`HR` is the mass resolution used to separate an interference, which is
+the job a collision cell does on a quadrupole, so it lands in the same `mode`
+field and a report can compare the two instruments like with like.
+
+The per-sample form states things MassHunter never does — the analysis type
+outright (so the sample type is read, not inferred from a name), the dilution
+factor, sample amount, final volume, whether an internal standard was active.
+Sample types come from `Analysis Type`; only when that is missing does it fall
+back to the name patterns in `element_ascii.template.yaml`, which you should
+adjust to your own sequence naming.
+
+## 10. Laser ablation runs
 
 If you have a laser log, pass it and icpms-qc will audit whether the results and the
 laser's own record describe the same run — patterns fired vs rows reported, names
