@@ -281,7 +281,16 @@ def _logical_header(raw: list[list[str]], tpl: templates.Template) -> tuple[list
         if lab:
             cur = lab
         if not sub:
-            names.append(cur)                       # e.g. the unnamed flag column
+            if cur in tpl.header_group_labels:
+                names.append(cur)                   # the unnamed flag column
+            elif not lab:
+                # Both header cells empty — a trailing or stray column. Carrying
+                # `cur` forward here would invent a second copy of the previous
+                # analyte, and a duplicate label is worse than an unmapped one:
+                # it looks real enough to be believed.
+                names.append(f"(unnamed column {i})")
+            else:
+                names.append(cur)                   # a label with no sub-header
         elif not cur or cur in tpl.header_group_labels:
             names.append(sub)                       # sample-info block columns
         else:
