@@ -1,0 +1,38 @@
+name: "A check got it wrong"
+description: "It passed something it should have failed, or failed something that was fine."
+title: "Check: <check_id> "
+labels: ["verdict"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A check that passes a bad batch is the worst thing this tool can do, so
+        please do report it. Thresholds live in the rule pack rather than in the
+        code, so quite often the fix is a setting — but a wrong verdict is worth
+        knowing about either way.
+  - type: input
+    id: check
+    attributes:
+      label: Which check
+      placeholder: "precision_rsd"
+    validations: { required: true }
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Which way
+      options:
+        - "Missed it — reported PASS when the batch was bad"
+        - "False alarm — reported FAIL when the batch was fine"
+        - "NOT_EVALUATED, but it had everything it needed"
+    validations: { required: true }
+  - type: textarea
+    id: detail
+    attributes:
+      label: What should it have said, and how do you know?
+      description: "e.g. the instrument software flagged it, or a reviewer caught it by hand."
+    validations: { required: true }
+  - type: textarea
+    id: rows
+    attributes:
+      label: "The relevant rows from qc_report.json, if you can share them"
+      render: json

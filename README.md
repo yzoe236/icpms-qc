@@ -49,13 +49,28 @@ the roadmap.
 
 ## Something not working?
 
-**Email me: [llh9389@gmail.com](mailto:llh9389@gmail.com)** — or
-[open an issue](https://github.com/yzoe236/icpms-qc/issues).
+Pick whichever costs you least:
 
-If it misread your export, or missed something it should have caught, I want to know.
-Send a **redacted** export — fake sample names, real column structure, plus your software
-version — and I will make it read yours. Every layout somebody sends is one more lab this
-works for out of the box, and it is genuinely the most useful thing you can contribute.
+| | |
+|---|---|
+| [**It could not read my export**](https://github.com/yzoe236/icpms-qc/issues/new?template=layout.yml) | a short form — instrument, software version, and a fingerprint |
+| [**A check got it wrong**](https://github.com/yzoe236/icpms-qc/issues/new?template=verdict.yml) | passed something bad, or failed something fine |
+| [**yzoe236@gmail.com**](mailto:yzoe236@gmail.com) | if you would rather not open an issue at all |
+
+**You never need to send data.** `icpms-qc inspect yourfile.csv` prints a layout
+fingerprint that is already safe to share — column headers and column kinds, never a
+single measurement, with free text outside lab vocabulary masked. Paste that.
+
+And if a run produces warnings, the tool hands you a link with the form **already filled
+in** from what it just printed. The only thing left to type is your software version:
+
+```
+Something it could not read? One click, form already filled in:
+  https://github.com/yzoe236/icpms-qc/issues/new?template=layout.yml&title=…&what=…
+```
+
+Every layout somebody sends is one more lab this works for out of the box. That is
+genuinely the most useful thing you can contribute.
 
 ## Who this is for (and who it isn't)
 

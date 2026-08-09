@@ -50,11 +50,38 @@ def _cmd_check(args) -> int:
     print(f"  report: {html_path}")
     print(f"  json:   {json_path}")
     if batch.warnings:
-        # The moment someone is most likely to help is the moment it let them
-        # down, so ask then rather than in a README they may never open.
-        print("\n  Something it could not read? Send a redacted export to "
-              "llh9389@gmail.com and it will read yours next time.")
+        print("\n  " + _report_link(batch, found))
     return 0 if verdict == "PASS" else 2
+
+
+REPO = "https://github.com/yzoe236/icpms-qc"
+EMAIL = "yzoe236@gmail.com"
+
+
+def _report_link(batch, found) -> str:
+    """A link that opens an issue form already filled in.
+
+    The moment someone is most likely to help is the moment the tool let them
+    down — but only if helping costs nothing. So rather than asking them to
+    describe what happened, the warnings it already printed are carried into the
+    form, and the only thing left to type is their software version.
+
+    Nothing here is data. Warnings name columns and sample-type strings, which is
+    layout, and the form itself tells them to paste a fingerprint rather than a file.
+    """
+    from urllib.parse import urlencode
+
+    what = "\n".join(f"- {w}" for w in batch.warnings[:12])
+    if len(batch.warnings) > 12:
+        what += f"\n- … and {len(batch.warnings) - 12} more"
+    query = urlencode({
+        "template": "layout.yml",
+        "title": f"Layout: {found.template if found else 'unknown'}",
+        "what": f"`icpms-qc check` reported:\n{what}",
+    })
+    return (f"Something it could not read? One click, form already filled in:\n"
+            f"  {REPO}/issues/new?{query}\n"
+            f"  or email a redacted export to {EMAIL} — it will read yours next time.")
 
 
 def _cmd_inspect(args) -> int:

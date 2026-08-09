@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Email me instead
+    url: mailto:yzoe236@gmail.com
+    about: "Prefer not to open an issue? Send a redacted export to yzoe236@gmail.com and I'll make it read yours."

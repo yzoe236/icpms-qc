@@ -1,0 +1,38 @@
+name: "icpms-qc could not read my export"
+description: "It failed, or it read the file but got the columns/sample types wrong."
+title: "Layout: <instrument> <software version>"
+labels: ["layout"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks — this is the single most useful thing anyone can send.
+
+        **Please do not attach real data.** A *redacted* export is what's needed:
+        fake sample names, real column structure. `icpms-qc inspect yourfile.csv`
+        prints a layout fingerprint that is already safe to paste — it carries
+        column headers and column kinds, never measurement values, and masks free
+        text outside lab vocabulary.
+  - type: input
+    id: instrument
+    attributes:
+      label: Instrument and software version
+      placeholder: "Agilent 7900, ICP-MS MassHunter 5.2"
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What went wrong
+      placeholder: "Errored out / read 0 analytes / every sample came back as OTHER / …"
+    validations: { required: true }
+  - type: textarea
+    id: fingerprint
+    attributes:
+      label: "Output of `icpms-qc inspect yourfile.csv`"
+      description: "Safe to paste — no measurements, client names masked."
+      render: json
+  - type: textarea
+    id: header
+    attributes:
+      label: "Or just the first 2–3 lines of the file, with sample names replaced"
+      render: text

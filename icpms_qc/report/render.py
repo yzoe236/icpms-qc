@@ -214,11 +214,16 @@ def to_html(batch: Batch, results: list[CheckResult]) -> str:
         "<br>Rule-pack thresholds are typical defaults — verify every limit against the "
         "current method text before compliance use. Not affiliated with any instrument "
         "vendor.<br><br>"
-        "<b>Did it misread your export, or miss something it should have caught?</b> "
-        "Email <a href='mailto:llh9389@gmail.com'>llh9389@gmail.com</a> — send a "
-        "<i>redacted</i> export (fake sample names, real column structure) and I will "
-        "make it read yours. Every layout someone sends is one more lab this works for "
-        "out of the box.</footer>")
+        "<b>Did it misread your export, or miss something it should have caught?</b><br>"
+        "&nbsp;&nbsp;&rarr; <a href='https://github.com/yzoe236/icpms-qc/issues/new?"
+        "template=layout.yml'>Report a layout it could not read</a> &nbsp;·&nbsp; "
+        "<a href='https://github.com/yzoe236/icpms-qc/issues/new?template=verdict.yml'>"
+        "Report a check that got it wrong</a> &nbsp;·&nbsp; "
+        "<a href='mailto:yzoe236@gmail.com'>yzoe236@gmail.com</a><br>"
+        "Send a <i>redacted</i> export — fake sample names, real column structure "
+        "(<code>icpms-qc inspect</code> prints one that is already safe to share). "
+        "Every layout someone sends is one more lab this works for out of the box."
+        "</footer>")
     parts.append("</main></body></html>")
     return "".join(parts)
 
