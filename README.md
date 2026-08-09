@@ -13,10 +13,18 @@ criterion evaluated, with the numbers behind each verdict, in a report you can h
 someone else — driven by versioned, editable rule packs (EPA 6020B-style, EPA 200.8-style,
 or your lab's own SOP).
 
-> Works with **Agilent ICP-MS MassHunter batch exports** today — single-quad (7700/7800/
-> 7900) and triple-quad MS/MS labels (`31 -> 47 P [O2]`, 8800/8900) alike, including
-> collision/reaction cell modes. Thermo Qtegra and PerkinElmer Syngistix export support is
-> on the roadmap — want it sooner? Open an issue with a redacted sample export.
+> Reads **Agilent ICP-MS MassHunter batch exports** — single-quad (7700/7800/7900) and
+> triple-quad MS/MS labels (`31 -> 47 P [O2]`, 8800/8900) alike, including
+> collision/reaction cell modes — and **Thermo Element 2 / Element XR ASCII exports**
+> (`.ASC`), both the multi-sample summary and the per-sample form, where a run is a
+> folder rather than a file:
+>
+> ```bash
+> icpms-qc check /path/to/element/run_folder --rules facility_basic
+> ```
+>
+> Thermo Qtegra and PerkinElmer Syngistix are still on the roadmap — want them sooner?
+> Open an issue with a redacted sample export.
 >
 > This project is not affiliated with or endorsed by any instrument vendor. MassHunter is a
 > trademark of Agilent Technologies. Method rule packs ship with *typical default* limits —

@@ -135,6 +135,10 @@ class Sample:
     flags: list[str] = field(default_factory=list)  # instrument-software QC flag text
     #: `flags` parsed into structure where the wording allowed it
     instrument_flags: list[InstrumentFlag] = field(default_factory=list)
+    #: Dilution applied before measurement, when the export states it. Most do
+    #: not, which is why a recomputed concentration can only ever be compared in
+    #: the vial rather than in the original sample.
+    dilution_factor: float | None = None
 
 
 @dataclass

@@ -1,0 +1,38 @@
+# Export-layout template: Thermo Element 2 / Element XR ASCII export (.ASC)
+#
+# The Element writes the transpose of a MassHunter export — one isotope per row,
+# one *block of columns* per sample — so there are no analyte-column patterns to
+# declare here. The geometry is read by icpms_qc.io.element; this file supplies
+# only what geometry cannot: what a sample name means.
+id: element_ascii
+instrument_family: thermo-element
+layout: transposed
+
+# The export states no sample type at all, only a name. These patterns are a
+# declared policy, not an inference in code: the first match wins, and a name
+# that matches nothing stays OTHER with a warning rather than being guessed at.
+# Adjust them to your own sequence naming.
+sample_type_patterns:
+  - { pattern: '(?i)^\s*blank\s*$',                      type: CAL_BLANK }
+  - { pattern: '(?i)\b\d+\s*ppb\b',                      type: CAL_STD }
+  - { pattern: '(?i)^\s*(rinse|wash)\b',                 type: CCB }
+  - { pattern: '(?i)\b(ccv|qc\s*check|check\s*std)\b',   type: CCV }
+
+# The per-sample export states its own "Analysis Type", which beats reading a
+# name. These are the strings the Element writes.
+sample_type_vocab:
+  STD: CAL_STD
+  BLK: CAL_BLANK
+  Blank: CAL_BLANK
+  SMP: SAMPLE
+  Sample: SAMPLE
+  UNK: SAMPLE
+
+# Standards are named by their concentration, as on the Agilent side.
+expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*ppb'
+
+# Everything not named as a standard or a blank is a sample. Stating that here
+# makes it a policy you can read and change; leaving it out makes every unmatched
+# name an OTHER with a warning, which is the safer default if your sequence
+# naming is less regular than this.
+default_sample_type: SAMPLE

@@ -18,9 +18,37 @@ from icpms_qc.qc import engine
 from icpms_qc.report import render
 
 
+def _load_batch(args):
+    """Pick a reader from what the path actually is, not from a flag.
+
+    A Thermo Element run is a *folder* of per-sample exports rather than one
+    file, so a directory is as valid an input here as a CSV.
+    """
+    from pathlib import Path as _P
+    from icpms_qc.io import element
+
+    target = _P(args.export_csv)
+    if target.is_dir():
+        return element.parse_folder(str(target), template=args.element_template)
+    if target.suffix.lower() == ".asc":
+        if element.looks_like_element_ascii(str(target)):
+            try:
+                return element.parse(str(target), template=args.element_template)
+            except ValueError:
+                sample, analytes, _ = element.parse_sample_file(
+                    str(target), template=args.element_template)
+                from icpms_qc.model import Batch
+                b = Batch(source_path=str(target), template_id=args.element_template,
+                          instrument_family="thermo-element")
+                b.samples, b.analytes, b.flags_column_mapped = [sample], analytes, True
+                return b
+        raise ValueError(f"{target}: not an Element ASCII export")
+    return masshunter.parse(args.export_csv, template=args.template)
+
+
 def _cmd_check(args) -> int:
     try:
-        batch = masshunter.parse(args.export_csv, template=args.template)
+        batch = _load_batch(args)
         if args.counts:
             masshunter.attach_intensities(batch, args.counts, template=args.counts_template)
         if args.laser_log:
@@ -141,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--template", default="masshunter_quant_wide",
                        help="export-layout template name or path to YAML")
     check.add_argument("--out", default="out", help="output directory for reports")
+    check.add_argument("--element-template", dest="element_template",
+                       default="element_ascii",
+                       help="template for Thermo Element ASCII input (.ASC file or "
+                            "a folder of per-sample exports)")
     check.add_argument("--counts", help="companion counts export for the same batch "
                        "(Count_*.csv beside Conc_*.csv) — merges raw intensities so "
                        "quant_crosscheck can verify the reported concentrations")

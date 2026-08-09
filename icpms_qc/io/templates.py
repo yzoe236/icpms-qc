@@ -53,6 +53,17 @@ class Template:
     istd_label_pattern: re.Pattern | None = None
     expected_conc_from_name: re.Pattern | None = None
     level_is_index: bool = False
+    #: "columns" (a sample per row) or "transposed" (a sample per column block,
+    #: as the Thermo Element writes). A transposed layout has no analyte-column
+    #: patterns to declare, because its columns are samples.
+    layout: str = "columns"
+    #: Name pattern -> SampleType, for layouts whose export states no type at all.
+    #: Ordered: the first match wins, and anything unmatched stays OTHER + warning.
+    sample_type_patterns: list[tuple[re.Pattern, SampleType]] = field(default_factory=list)
+    #: What an unmatched name means, when a lab is willing to state it. Left
+    #: unset the parser warns and marks OTHER, which is the right default; set in
+    #: a template it is a declared policy in a reviewable file, not a guess.
+    default_sample_type: SampleType | None = None
 
 
 def resolve_path(name_or_path: str) -> Path:
@@ -76,8 +87,9 @@ def load(name_or_path: str) -> Template:
     def pat(key: str) -> re.Pattern | None:
         return re.compile(data[key]) if data.get(key) else None
 
+    layout = str(data.get("layout", "columns"))
     conc = pat("analyte_conc_pattern")
-    if conc is None and not data.get("analyte_cps_pattern"):
+    if layout == "columns" and conc is None and not data.get("analyte_cps_pattern"):
         raise ValueError(
             "template must define analyte_conc_pattern and/or analyte_cps_pattern")
 
@@ -102,4 +114,9 @@ def load(name_or_path: str) -> Template:
         istd_label_pattern=pat("istd_label_pattern"),
         expected_conc_from_name=pat("expected_conc_from_name"),
         level_is_index=bool(data.get("level_is_index", False)),
+        layout=layout,
+        sample_type_patterns=[(re.compile(str(r["pattern"])), SampleType(str(r["type"])))
+                              for r in (data.get("sample_type_patterns") or [])],
+        default_sample_type=(SampleType(str(data["default_sample_type"]))
+                             if data.get("default_sample_type") else None),
     )
