@@ -19,8 +19,7 @@ from icpms_qc.io import element, masshunter
 from icpms_qc.model import Batch, SampleType
 
 #: Tried in order; ties break toward the earlier entry.
-MASSHUNTER_TEMPLATES = ("masshunter_conc_2row", "masshunter_counts_2row",
-                        "masshunter_quant_wide")
+MASSHUNTER_TEMPLATES = ("masshunter_2row", "masshunter_quant_wide")
 
 #: How a paired export names itself relative to its partner.
 _PAIRS = (("count", "conc"), ("conc", "count"),

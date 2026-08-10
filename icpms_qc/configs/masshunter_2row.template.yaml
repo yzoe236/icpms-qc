@@ -1,0 +1,52 @@
+# Export-layout template: real-world MassHunter concentration export
+# ("two-row header" family, observed in the field 2026-07):
+#   row 1: analyte labels spanning column pairs — "56  Fe  [ No Gas ] ,,..."
+#   row 2: measure sub-headers — "Conc., Conc. RSD, ..."
+#   col 1: unnamed column carrying MassHunter's own QC flag text
+#   Level column holds a level INDEX (1..n) — expected conc lives in the sample
+#   name ("100ppb 71A"); QC1..QC5 are re-reads of the cal standards (≈ CCV).
+# Encoding is ANSI (cp1252), not UTF-8.
+id: masshunter_2row
+instrument_family: agilent-masshunter
+encoding: cp1252
+header_rows: 2
+header_group_labels: ["Sample"]
+columns:
+  sample_name: "Sample Name"
+  sample_type: "Type"
+  level: "Level"
+  flags: "Sample"          # the unnamed first column inherits the group label
+level_is_index: true
+expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*ppb'
+# A single export can carry both measures, and reading only one silently
+# halves the batch: the columns for the other are reported as unmapped and
+# then dropped. Declaring both means whichever template is chosen, nothing
+# is left behind. The two layouts still differ in everything else.
+analyte_conc_pattern: '^(?P<label>.+?)\s*::\s*Conc\.(\s*\[\s*(?P<unit>[^\]]+)\s*\])?$'
+analyte_cps_pattern: '^(?P<label>.+?)\s*::\s*(?:CPS|[Cc]ounts [Pp]er [Ss]econd)$'
+istd_label_pattern: 'ISTD'
+# Precision, kept rather than discarded: replicate %RSD is the one thing a
+# research batch most often fails on, and the accuracy checks cannot see it.
+# Matched before ignore_patterns, so the 'RSD$' rule below still covers any
+# RSD column this pattern does not claim.
+analyte_rsd_pattern: '^(?P<label>.+?)\s*::\s*(?:CPS|Conc\.)\s*RSD$'
+ignore_patterns:
+  - 'RSD$'
+  - '^Rjct$'
+  - '^Data File$'
+  - '^Acq\. Date-Time$'
+  - '^Comment$'
+  - '^Vial Number$'
+sample_type_vocab:
+  Bkgnd: OTHER          # background scan, not a prepared blank; see the note below
+  DriftChk: CCV         # periodic re-read of a known standard to watch drift,
+                        # which is what a continuing verification is
+  CalBlk: CAL_BLANK
+  CalStd: CAL_STD
+  QC1: CCV
+  QC2: CCV
+  QC3: CCV
+  QC4: CCV
+  QC5: CCV
+  BlkVrfy: CCB
+  Sample: SAMPLE

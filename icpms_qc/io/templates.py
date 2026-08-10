@@ -81,8 +81,19 @@ def resolve_path(name_or_path: str) -> Path:
         f"template '{name_or_path}' not found in {_REPO_CONFIG_DIR} or ./configs")
 
 
-def load(name_or_path: str) -> Template:
+def load(name_or_path: str, _seen: frozenset[str] = frozenset()) -> Template:
     data = yaml.safe_load(resolve_path(name_or_path).read_text(encoding="utf-8"))
+
+    # A template may simply name another. Two layouts that turned out to be the
+    # same thing keep both names working without keeping two copies to drift
+    # apart, which is how a pair of templates ends up disagreeing by accident.
+    if target := data.get("alias_of"):
+        target = str(target)
+        if target in _seen:
+            raise ValueError(f"template alias loop: {' -> '.join([*_seen, target])}")
+        alias = load(target, _seen | {target})
+        alias.id = str(data.get("id", alias.id))
+        return alias
 
     def pat(key: str) -> re.Pattern | None:
         return re.compile(data[key]) if data.get(key) else None

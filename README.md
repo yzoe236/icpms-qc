@@ -13,7 +13,7 @@ your file is, reads it, and writes `out/qc_report.html` for you and `out/qc_repo
 for your scripts.
 
 ```
-  read as: masshunter · masshunter_conc_2row · paired with Count_12052024.csv
+  read as: masshunter · masshunter_2row · paired with Count_12052024.csv
 icpms-qc FAIL: Conc_12052024.csv
   [         PASS] cal_linearity
   [         FAIL] precision_rsd   - 76 failing row(s)
@@ -193,7 +193,7 @@ Counts and concentrations usually live in two files — `Count_0816.csv` beside
 `Conc_0816.csv`. Pass the companion with `--counts` and they are paired by sequence:
 
 ```bash
-icpms-qc check Conc_0816.csv --counts Count_0816.csv --template masshunter_conc_2row
+icpms-qc check Conc_0816.csv --counts Count_0816.csv
 ```
 
 **The instrument's own verdict is carried, not discarded.** MassHunter writes its QC

@@ -76,8 +76,7 @@ Shipped templates:
 | template | layout |
 |---|---|
 | `masshunter_quant_wide` | one header row, `9 Be Conc. [ppb]` style columns |
-| `masshunter_conc_2row` | two header rows (analyte labels above `Conc.`/`RSD` sub-headers), cp1252, Level column holds an index |
-| `masshunter_counts_2row` | as above, raw counts rather than concentrations |
+| `masshunter_2row` | two header rows (analyte labels above `Conc.`/`CPS`/`RSD` sub-headers), cp1252, Level column holds an index. Reads both concentrations and counts. `masshunter_conc_2row` and `masshunter_counts_2row` still work as names for it |
 | `element_ascii` | Thermo Element 2 / XR `.ASC` — see §9, it is not a CSV layout |
 
 ### 3b. Look at what you actually have
@@ -238,7 +237,7 @@ lab that wants both exports the batch twice — `Count_0816.csv` beside
 `Conc_0816.csv`. Pass the companion and they are paired by sequence:
 
 ```bash
-icpms-qc check Conc_0816.csv --counts Count_0816.csv --template masshunter_conc_2row
+icpms-qc check Conc_0816.csv --counts Count_0816.csv
 ```
 
 Merging them unlocks two checks that need signal and result together:
