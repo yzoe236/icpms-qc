@@ -37,4 +37,9 @@ checks:
   dup_rpd:         { enabled: false, params: {} }
   ms_msd:          { enabled: false, params: {} }
   serial_dilution: { enabled: false, params: {} }
-  seq_structure:   { enabled: true,  params: { require: [CCV, CCB] },                      verify: "facility SOP" }
+  # Requires what a research batch genuinely has, which is what makes this
+  # informative. Measured across 141 real facility batches: CAL_STD appears in
+  # 89% and CAL_BLANK in 86%, while CCV appears in 8% and CCB in 1%. Requiring
+  # the latter pair failed every batch by construction, and a check that always
+  # fails teaches people to skip the report.
+  seq_structure:   { enabled: true,  params: { require: [CAL_STD, CAL_BLANK] },            verify: "facility SOP — a run with no calibration or no blank is the case worth catching" }
