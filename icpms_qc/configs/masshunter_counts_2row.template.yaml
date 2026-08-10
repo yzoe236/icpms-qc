@@ -14,7 +14,12 @@ columns:
   flags: "Sample"
 level_is_index: true
 expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*ppb'
+# A single export can carry both measures, and reading only one silently
+# halves the batch: the columns for the other are reported as unmapped and
+# then dropped. Declaring both means whichever template is chosen, nothing
+# is left behind. The two layouts still differ in everything else.
 analyte_cps_pattern: '^(?P<label>.+?)\s*::\s*CPS$'
+analyte_conc_pattern: '^(?P<label>.+?)\s*::\s*Conc\.(\s*\[\s*(?P<unit>[^\]]+)\s*\])?$'
 istd_label_pattern: 'ISTD'
 # Precision, kept rather than discarded: replicate %RSD is the one thing a
 # research batch most often fails on, and the accuracy checks cannot see it.
@@ -29,6 +34,13 @@ ignore_patterns:
   - '^Comment$'
   - '^Vial Number$'
 sample_type_vocab:
+  # A background scan, not a prepared blank: no Level, and only a handful of
+  # cells filled. Declared here so it stops being reported as unknown, and
+  # deliberately mapped to OTHER rather than to a blank type — counting it as a
+  # blank would pull instrument background into blank_derived_lod's 3-sigma
+  # estimate, and that check is worth having only because it measures the
+  # scatter of real prepared blanks.
+  Bkgnd: OTHER
   CalBlk: CAL_BLANK
   CalStd: CAL_STD
   QC1: CCV

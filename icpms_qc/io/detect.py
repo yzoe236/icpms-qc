@@ -50,10 +50,30 @@ def _score(batch: Batch) -> tuple[int, int, int]:
 
 
 def find_companion_counts(path: str) -> str | None:
-    """`Conc_0816.csv` → `Count_0816.csv` sitting beside it, if it exists."""
+    """Find the counts export belonging to this concentration export.
+
+    Three naming habits show up across a facility, sometimes in one folder:
+    swapped (`Conc_0816` / `Count_0816`), differently cased (`CONC` / `COUNT`),
+    and appended, where the concentration file is the counts filename with a
+    suffix bolted on (`airfilter_count_0710_conc` beside `airfilter_count_0710`).
+    The last one defeats a straight substitution, because both words are in the
+    same name.
+    """
     p = Path(path)
+    stem = p.stem
+
+    # Appended form first: the partner's name is this one minus the suffix, and
+    # substituting inside it would mangle the counts word that is already there.
+    for word in ("conc", "concentration"):
+        for sep in ("_", "-", " "):
+            tail = f"{sep}{word}"
+            if stem.lower().endswith(tail):
+                candidate = p.with_name(stem[: -len(tail)] + p.suffix)
+                if candidate.exists() and candidate != p:
+                    return str(candidate)
+
     for a, b in _PAIRS:
-        if a in p.stem:
+        if a in stem:
             candidate = p.with_name(p.name.replace(a, b, 1))
             if candidate.exists() and candidate != p:
                 return str(candidate)
