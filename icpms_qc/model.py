@@ -48,6 +48,11 @@ class Analyte:
     #: differently across software versions, and inventing a canonical spelling
     #: would silently merge two columns a lab deliberately keeps apart.
     mode: str | None = None
+    #: Emission wavelength in nm, for optical emission rather than mass spectrometry.
+    #: An OES analyte has no mass at all: it is identified by which spectral line
+    #: was measured, and the same element commonly appears on several lines whose
+    #: results are expected to agree.
+    wavelength_nm: float | None = None
 
     @property
     def is_msms(self) -> bool:
@@ -57,6 +62,8 @@ class Analyte:
     @property
     def key(self) -> str:
         """Element+mass+mode identity, for grouping the same element across modes."""
+        if self.wavelength_nm is not None:
+            return f"{self.element or '?'} {self.wavelength_nm:g} nm"
         parts = [self.element or "?", str(self.mass or "?")]
         if self.mass_shift is not None:
             parts.append(f"->{self.mass_shift}")

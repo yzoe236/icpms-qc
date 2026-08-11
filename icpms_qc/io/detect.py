@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from icpms_qc.io import element, masshunter
+from icpms_qc.io import element, masshunter, oes
 from icpms_qc.model import Batch, SampleType
 
 #: Tried in order; ties break toward the earlier entry.
@@ -85,6 +85,11 @@ def detect(path: str, rules_hint: str | None = None) -> Detection:
 
     if target.is_dir():
         return Detection(element.parse_folder(str(target)), "element", "element_ascii")
+
+    if target.suffix.lower() in {".xlsx", ".xlsm"}:
+        if not oes.looks_like_oes_workbook(str(target)):
+            raise ValueError(f"{target.name}: not an ICP Expert workbook")
+        return Detection(oes.parse(str(target)), "icp-oes", "agilent_oes")
 
     if target.suffix.lower() == ".asc":
         try:

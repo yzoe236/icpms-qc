@@ -1,0 +1,25 @@
+# Export-layout template: Agilent ICP Expert workbook (ICP-OES, 700/5000 series)
+#
+# The workbook's geometry is read by icpms_qc.io.oes: one sheet per measure,
+# one sample per row, analytes identified by emission wavelength. This file
+# supplies only what geometry cannot, which is what a sample name means.
+id: agilent_oes
+instrument_family: agilent-icp-oes
+layout: transposed        # not column-patterned; the reader knows the shape
+
+columns:
+  unit: ppb               # "Conc. in Sample Units" is whatever the method set
+
+# The export states a QC Status but never a sample type, so names decide. First
+# match wins; anything unmatched stays OTHER with a warning. Adjust to your own
+# sequence naming.
+sample_type_patterns:
+  - { pattern: '(?i)\bblank\b',                         type: CAL_BLANK }
+  - { pattern: '(?i)\b\d+(?:\.\d+)?\s*(?:ppb|ppm|mg/l|ug/l)\b', type: CAL_STD }
+  - { pattern: '(?i)^\s*(rinse|wash)\b',                type: CCB }
+  - { pattern: '(?i)\b(ccv|qc\s*check|check\s*std|drift)\b', type: CCV }
+
+expected_conc_from_name: '(?P<value>\d+(?:\.\d+)?)\s*(?:ppb|ppm|mg/L|ug/L)'
+
+# Anything not named as a standard, blank or check is a sample.
+default_sample_type: SAMPLE
