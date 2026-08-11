@@ -360,6 +360,7 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
     batch.flags_column_mapped = bool(flags_col)
 
     unknown_types: set[str] = set()
+    blank_rows = 0
     for i, row_vals in enumerate(data_rows):
         row = dict(zip(names, row_vals))
         type_str = (row.get(type_col) or "").strip()
@@ -411,7 +412,21 @@ def parse(export_csv: str, template: str = "masshunter_quant_wide") -> Batch:
             sample.flags.append(flag_text)
             sample.instrument_flags = parse_instrument_flags(flag_text, analyte_labels)
 
+        # A row with no type, no name and not one reported measurement is padding
+        # at the foot of the file, not a sample. Counting it inflates the batch
+        # and buries the rows whose type is blank but whose data is real, and
+        # those are the ones worth asking about.
+        if (stype is SampleType.OTHER and not type_str
+                and sample.name.startswith("row")
+                and not any(r.conc is not None or r.intensity is not None
+                            for r in sample.results.values())):
+            blank_rows += 1
+            continue
+
         batch.samples.append(sample)
 
+    if blank_rows:
+        batch.warnings.append(
+            f"{blank_rows} empty row(s) below the data were skipped")
     batch.samples.sort(key=lambda s: s.seq_index)
     return batch
