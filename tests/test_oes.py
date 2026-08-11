@@ -21,7 +21,10 @@ from icpms_qc.model import SampleType
 def test_an_analyte_is_a_wavelength_not_a_mass(text, element, nm):
     a = oes.analyte_from_line(text)
     assert (a.element, a.wavelength_nm, a.mass) == (element, nm, None)
-    assert a.label == f"{element} {nm:g}"      # unit never enters the label
+    # The label keeps the wavelength exactly as the export wrote it, trailing
+    # zero and all, as every label in this project does. Only the unit is
+    # stripped, because it describes the measure rather than the analyte.
+    assert a.label == text.split("(")[0].strip().replace("\n", " ")
 
 
 def test_units_are_read_from_the_header_not_assumed():
