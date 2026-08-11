@@ -99,3 +99,64 @@ def test_a_workbook_that_is_not_icp_expert_is_refused(tmp_path):
     assert not oes.looks_like_oes_workbook(str(p))
     with pytest.raises(ValueError, match="not an ICP Expert workbook"):
         oes.parse(str(p))
+
+
+# ── line agreement, the check optical emission needs and mass spec does not ──
+
+def _batch_with_lines(pairs):
+    """pairs: list of (conc_on_line_A, conc_on_line_B) per sample."""
+    from icpms_qc.model import Analyte, Batch, Result, Sample, SampleType
+    b = Batch(source_path="x", template_id="agilent_oes",
+              instrument_family="agilent-icp-oes")
+    b.analytes = [Analyte(label="Cr 205.560", element="Cr", wavelength_nm=205.560),
+                  Analyte(label="Cr 267.716", element="Cr", wavelength_nm=267.716)]
+    for i, (a, c) in enumerate(pairs, start=1):
+        s = Sample(name=f"S{i}", seq_index=i, type=SampleType.SAMPLE)
+        s.results = {"Cr 205.560": Result(conc=a, unit="mg/L"),
+                     "Cr 267.716": Result(conc=c, unit="mg/L")}
+        b.samples.append(s)
+    return b
+
+
+P = {"max_relative_diff": 0.25, "min_conc_x_loq": 10,
+     "systematic_share": 0.8, "loq_ppb": {"default": 0.1}}
+
+
+def test_lines_that_agree_pass():
+    from icpms_qc.qc import checks
+    from icpms_qc.qc.checks import Outcome
+    res = checks.oes_line_agreement(
+        _batch_with_lines([(10.0, 10.4), (20.0, 19.2), (30.0, 31.0)]), P)
+    assert res.outcome == Outcome.PASS
+
+
+def test_one_line_always_high_is_named_an_interference():
+    """The real case this was built from: Fe emission riding on Cr 267.716.
+
+    Both lines calibrate cleanly and still disagree, and the gap is one-sided.
+    That is an overlap, not imprecision, and the report has to say which.
+    """
+    from icpms_qc.qc import checks
+    from icpms_qc.qc.checks import Outcome
+    res = checks.oes_line_agreement(
+        _batch_with_lines([(10.0, 14.0), (20.0, 29.0), (30.0, 44.0), (40.0, 57.0)]), P)
+    assert res.outcome == Outcome.FAIL
+    row = next(d for d in res.details if d["ok"] is False)
+    assert "Cr 267.716 reads higher" in row["note"]
+    assert "interference" in row["note"]
+
+
+def test_two_sided_scatter_is_not_called_an_interference():
+    from icpms_qc.qc import checks
+    res = checks.oes_line_agreement(
+        _batch_with_lines([(10.0, 14.0), (20.0, 14.0), (30.0, 44.0), (40.0, 28.0)]), P)
+    row = next(d for d in res.details if d["ok"] is False)
+    assert "scatter rather than an interference" in row["note"]
+
+
+def test_a_single_line_element_has_nothing_to_compare():
+    from icpms_qc.qc import checks
+    from icpms_qc.qc.checks import Outcome
+    b = _batch_with_lines([(10.0, 10.0)])
+    b.analytes = b.analytes[:1]
+    assert checks.oes_line_agreement(b, P).outcome == Outcome.NOT_EVALUATED

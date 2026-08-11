@@ -32,7 +32,7 @@ whether the batch is usable, which samples the failure reaches, or what to check
 the run and say "I have reviewed this, it can be reported" — and in most labs that
 somebody is one experienced person, one batch at a time.
 
-icpms-qc automates the reviewable part: 20 QC criteria evaluated, with the numbers behind
+icpms-qc automates the reviewable part: 21 QC criteria evaluated, with the numbers behind
 every verdict, in a report you can hand to someone else.
 
 ## What it reads
@@ -42,6 +42,7 @@ every verdict, in a report you can hand to someone else.
 | **Agilent MassHunter** | batch exports (CSV), single-quad 7700/7800/7900 and triple-quad MS/MS (`31 -> 47 P [O2]`, 8800/8900), collision and reaction cell modes |
 | **Thermo Element 2 / XR** | ASCII exports (`.ASC`) — point it at the **run folder**, since the Element writes a file per sample |
 | **Count + Conc pairs** | `Conc_0816.csv` with `Count_0816.csv` beside it is paired automatically |
+| **Agilent ICP Expert** | ICP-OES workbooks (`.xlsx`). Analytes are emission wavelengths rather than masses, and `oes_line_agreement` asks whether an element's lines agree — a line reading consistently high is a spectral interference, not scatter. Needs `pip install 'icpms-qc[oes]'` |
 
 Tested against **165 real MassHunter exports and 212 real Element files** — 99%+ read
 without being told anything about them. Thermo Qtegra and PerkinElmer Syngistix are on

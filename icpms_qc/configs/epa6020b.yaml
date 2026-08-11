@@ -45,4 +45,8 @@ checks:
   dup_rpd:         { enabled: true, params: { max_rpd_pct: 20, min_conc_x_loq: 5 },       verify: "6020B duplicate criteria" }
   ms_msd:          { enabled: true, params: { window_pct: [75, 125], max_rpd_pct: 20 },   verify: "6020B matrix spike criteria" }
   serial_dilution: { enabled: true, params: { factor: 5, agreement_pct: 10, min_conc_x_loq: 50 }, verify: "6020B serial dilution test" }
+  # Optical emission only: several lines per element should give the same answer.
+  # Tolerance and the relative-difference form come from the reduction script this
+  # was checked against. NOT_EVALUATED on mass-spectrometry batches.
+  oes_line_agreement: { enabled: true, params: { max_relative_diff: 0.25, min_conc_x_loq: 10, systematic_share: 0.8 }, verify: "lab practice — a line reading consistently high is an interference, not scatter" }
   seq_structure:   { enabled: true, params: { require: [ICV, ICB, MB, LCS] },             verify: "lab SOP / method QC section" }

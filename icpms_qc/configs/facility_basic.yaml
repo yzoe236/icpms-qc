@@ -42,4 +42,8 @@ checks:
   # 89% and CAL_BLANK in 86%, while CCV appears in 8% and CCB in 1%. Requiring
   # the latter pair failed every batch by construction, and a check that always
   # fails teaches people to skip the report.
+  # Optical emission only: several lines per element should give the same answer.
+  # Tolerance and the relative-difference form come from the reduction script this
+  # was checked against. NOT_EVALUATED on mass-spectrometry batches.
+  oes_line_agreement: { enabled: true, params: { max_relative_diff: 0.25, min_conc_x_loq: 10, systematic_share: 0.8 }, verify: "lab practice — a line reading consistently high is an interference, not scatter" }
   seq_structure:   { enabled: true,  params: { require: [CAL_STD, CAL_BLANK] },            verify: "facility SOP — a run with no calibration or no blank is the case worth catching" }

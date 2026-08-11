@@ -1011,6 +1011,77 @@ def serial_dilution(batch: Batch, params: dict) -> CheckResult:
                    warn_reason="serial dilution present but parent below assessment threshold")
 
 
+def oes_line_agreement(batch: Batch, params: dict) -> CheckResult:
+    """Do an element's emission lines agree with each other?
+
+    Optical emission measures an element on several spectral lines at once, and
+    they should give the same answer. This check has no mass-spectrometry
+    counterpart, and it is the reason a lab looks at OES data by hand at all.
+
+    What separates a real finding from noise is the *shape* of the disagreement.
+    Scatter is imprecision. A line that reads consistently high across every
+    sample is a spectral interference sitting on it, and that is the case worth
+    naming: another element's emission falling on the same wavelength adds a
+    contribution that does not vary randomly. Reporting a per-sample percentage
+    would bury it.
+
+    The tolerance and the way the difference is measured, relative to the larger
+    of the pair, are taken from the reduction script this was checked against
+    rather than invented here.
+    """
+    lines: dict[str, list] = {}
+    for a in batch.analytes:
+        if a.wavelength_nm is not None and a.element:
+            lines.setdefault(a.element, []).append(a)
+    multi = {e: v for e, v in lines.items() if len(v) >= 2}
+    if not multi:
+        return _ne("oes_line_agreement",
+                   "no element is measured on more than one emission line")
+
+    tol = float(params.get("max_relative_diff", 0.25))
+    mult = float(params.get("min_conc_x_loq", 10))
+    bias_share = float(params.get("systematic_share", 0.8))
+
+    details: list[dict] = []
+    for element, group in sorted(multi.items()):
+        for i in range(len(group)):
+            for j in range(i + 1, len(group)):
+                a, b = group[i], group[j]
+                diffs, higher = [], []
+                for s in batch.samples:
+                    ra, rb = s.results.get(a.label), s.results.get(b.label)
+                    if not ra or not rb or ra.conc is None or rb.conc is None:
+                        continue
+                    biggest = max(abs(ra.conc), abs(rb.conc))
+                    if biggest <= mult * _loq_for(a.label, params):
+                        continue          # near the blank, the ratio means nothing
+                    diffs.append(abs(ra.conc - rb.conc) / biggest)
+                    higher.append(ra.conc > rb.conc)
+                if len(diffs) < 2:
+                    continue
+
+                worst = max(diffs)
+                row = {"element": element, "lines": f"{a.label} vs {b.label}",
+                       "n": len(diffs), "max_diff_pct": round(worst * 100, 1),
+                       "tolerance_pct": round(tol * 100, 1), "ok": worst <= tol}
+                if worst > tol:
+                    share = max(sum(higher), len(higher) - sum(higher)) / len(higher)
+                    if share >= bias_share:
+                        high = a.label if sum(higher) >= len(higher) / 2 else b.label
+                        row["note"] = (
+                            f"{high} reads higher in {share:.0%} of samples, not at "
+                            f"random — the signature of a spectral interference on "
+                            f"that line rather than imprecision")
+                    else:
+                        row["note"] = ("the two lines disagree without either being "
+                                       "consistently higher, which reads as scatter "
+                                       "rather than an interference")
+                details.append(row)
+
+    return _finish("oes_line_agreement", details,
+                   warn_reason="no pair of lines had enough comparable samples")
+
+
 def seq_structure(batch: Batch, params: dict) -> CheckResult:
     """Required QC sample types are present in the batch."""
     required = [str(t) for t in params.get("require", [])]
@@ -1043,5 +1114,6 @@ CATALOG = {
     "dup_rpd": dup_rpd,
     "ms_msd": ms_msd,
     "serial_dilution": serial_dilution,
+    "oes_line_agreement": oes_line_agreement,
     "seq_structure": seq_structure,
 }

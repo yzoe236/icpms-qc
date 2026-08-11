@@ -106,6 +106,7 @@ packs — confirm against the current method text before compliance use.**
 | `dup_rpd` | duplicate relative percent difference | ≤ 20% (when both > 5×LOQ) |
 | `ms_msd` | matrix spike / spike dup recovery + RPD | 75–125%, RPD ≤ 20% |
 | `serial_dilution` | 5× dilution agreement (conc sufficiently above LOQ) | within ±10% |
+| `oes_line_agreement` | ICP-OES: do an element's emission lines agree | ≤25% relative; a one-sided gap is named an interference |
 | `seq_structure` | required QC types present (ICV/ICB after cal, MB, LCS per batch) | pack-defined |
 
 Per-check outcome: `PASS / FAIL / WARN / NOT_EVALUATED(reason)` — a check that can't run
