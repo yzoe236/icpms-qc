@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "icpms-qc"
+abstract: >-
+  Post-run quality control review for ICP-MS and ICP-OES batch exports. Reads
+  instrument export files, applies configurable QC rule packs to calibration,
+  continuing calibration verification, internal standards, duplicates and
+  blanks, and writes an HTML and JSON report stating whether the batch can be
+  reported and why not.
+authors:
+  - family-names: Li
+    given-names: Linhan
+version: 0.1.0
+date-released: "2026-08-14"
+license: MIT
+repository-code: "https://github.com/yzoe236/icpms-qc"
+url: "https://github.com/yzoe236/icpms-qc"
+keywords:
+  - ICP-MS
+  - ICP-OES
+  - quality control
+  - analytical chemistry
+  - mass spectrometry
+  - method validation

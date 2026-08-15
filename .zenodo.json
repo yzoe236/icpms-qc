@@ -1,0 +1,21 @@
+{
+  "title": "icpms-qc: post-run quality control review for ICP-MS and ICP-OES batch exports",
+  "description": "<p>Reads Agilent MassHunter batch exports (ICP-MS) and Agilent ICP Expert workbooks (ICP-OES), applies configurable QC rule packs to calibration, continuing calibration verification, internal standards, duplicates and blanks, and writes an HTML and JSON report stating whether the batch can be reported and why not.</p><p>Calibration is checked by per-level back-calculation as well as linearity, because a correlation coefficient is dominated by the high end of the curve and a bottom standard reading half its true value can still report r above 0.999. For optical emission the several spectral lines measured for one element are compared against each other, separating random scatter from spectral interference and naming the line at fault when one reads consistently high.</p><p>The command line interface exits 0 on pass, 2 on fail and 1 on error, so it can be dropped into a pipeline.</p>",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Li, Linhan"
+    }
+  ],
+  "keywords": [
+    "ICP-MS",
+    "ICP-OES",
+    "quality control",
+    "analytical chemistry",
+    "mass spectrometry",
+    "method validation",
+    "EPA 6020B"
+  ]
+}
