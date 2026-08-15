@@ -9,7 +9,7 @@ tags:
   - method validation
 authors:
   - name: Linhan Li
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0002-2601-3868
     affiliation: 1
 affiliations:
   - name: Independent researcher
