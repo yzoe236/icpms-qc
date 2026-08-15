@@ -6,6 +6,32 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-14
+
+First version published to PyPI. Install with `pip install icpms-qc`.
+
+### Fixed
+
+* Sample names taken from the Element's recorded data-file path were wrong on
+  Linux and macOS. That path is written by the instrument software, which runs
+  on Windows, so it is a Windows path wherever the tool itself runs; reading it
+  with `pathlib.Path` on a POSIX host left the whole string intact and a sample
+  came out named `E:\Data\Citro\10 ppb`. It is now read as a Windows path.
+
+### Changed
+
+* The package summary says ICP-OES as well as ICP-MS, which has been true since
+  the ICP Expert reader landed.
+
+### Added
+
+* Continuous integration running the suite on Python 3.10 through 3.13, which
+  is what caught the path bug above on its first run.
+* `CITATION.cff`, so GitHub offers a Cite this repository button.
+* `CONTRIBUTING.md`, `paper.md` and `paper.bib`.
+* `docs/RELEASING.md`, and a publish workflow using PyPI trusted publishing,
+  so releasing needs no API token.
+
 ## [0.1.0] - 2026-08-14
 
 First published version.
@@ -41,5 +67,6 @@ First published version.
 this has been run against real batches, but by one person and on two
 instrument families.
 
-[Unreleased]: https://github.com/yzoe236/icpms-qc/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/yzoe236/icpms-qc/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/yzoe236/icpms-qc/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/yzoe236/icpms-qc/releases/tag/v0.1.0
