@@ -74,7 +74,7 @@ calibration on its correlation coefficient, but that statistic is dominated by
 the high end of the curve, and a bottom standard recovering at half its prepared
 value can coexist with an r above 0.999. Calibration guidance has long argued
 that linearity should be judged on residuals rather than on r
-[@eurachem2014fitness]. The tool reports each calibration level back-calculated
+[@eurachem2025fitness]. The tool reports each calibration level back-calculated
 against its own curve, and flags the levels that miss, which in practice is the
 low end where the reporting limit lives. A companion diagnostic reports whether
 relative error is systematically larger at low concentration than high, the

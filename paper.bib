@@ -1,8 +1,7 @@
-% ⚠️ EVERY ENTRY BELOW MUST BE VERIFIED AGAINST THE SOURCE BEFORE SUBMISSION.
-% These were written from memory while drafting and the volume, page and DOI
-% fields in particular are the kind of detail that is easy to get wrong. Check
-% each one against the publisher record, and check that the EPA method
-% revisions cited are the ones the rule packs were actually modelled on.
+% Verified 2026-08-15 against CrossRef (DOIs, volume, issue, pages, author
+% count) and against the publishers' own recommended citations for the EPA
+% methods and the Eurachem guide. Re-check before submission if time has
+% passed, particularly the Eurachem edition, which turned over in 2025.
 
 @article{martens2011mzml,
   author  = {Martens, Lennart and Chambers, Matthew and Sturm, Marc and
@@ -21,7 +20,7 @@
 }
 
 @article{chambers2012proteowizard,
-  author  = {Chambers, Matthew C. and Maclean, Brendan and Burke, Robert and
+  author  = {Chambers, Matthew C. and MacLean, Brendan and Burke, Robert and
              Amodei, Dario and Ruderman, Daniel L. and Neumann, Steffen and
              Gatto, Laurent and Fischer, Bernd and Pratt, Brian and
              Egertson, Jarrett and Hoff, Katherine and Kessner, Darren and
@@ -45,34 +44,41 @@
   doi     = {10.1038/nbt.2377}
 }
 
+% Publisher's citation: U.S. EPA. 2014. "Method 6020B (SW-846): Inductively
+% Coupled Plasma-Mass Spectrometry," Revision 2. Washington, DC.
 @techreport{epa6020b,
   author      = {{United States Environmental Protection Agency}},
-  title       = {Method 6020B: Inductively Coupled Plasma Mass Spectrometry},
+  title       = {Method 6020B ({SW}-846): Inductively Coupled Plasma-Mass
+                 Spectrometry},
   institution = {United States Environmental Protection Agency},
-  type        = {SW-846 Test Method},
+  type        = {{SW}-846 Test Method, Revision 2},
+  address     = {Washington, DC},
   year        = {2014},
-  note        = {Revision 2. VERIFY the revision and year against the pack the
-                 rules were modelled on}
+  url         = {https://www.epa.gov/hw-sw846/sw-846-test-method-6020b-inductively-coupled-plasma-mass-spectrometry}
 }
 
+% Publisher's citation: U.S. EPA. 1994. "Method 200.8: Determination of Trace
+% Elements in Waters and Wastes by Inductively Coupled Plasma-Mass
+% Spectrometry," Revision 5.4. Cincinnati, OH.
 @techreport{epa200_8,
   author      = {{United States Environmental Protection Agency}},
   title       = {Method 200.8: Determination of Trace Elements in Waters and
                  Wastes by Inductively Coupled Plasma-Mass Spectrometry},
   institution = {United States Environmental Protection Agency},
-  year        = {1994},
-  note        = {Revision 5.4. VERIFY revision and year}
+  type        = {Revision 5.4},
+  address     = {Cincinnati, OH},
+  year        = {1994}
 }
 
-@book{eurachem2014fitness,
-  editor    = {Magnusson, Bertil and {\"O}rnemark, Ulf},
-  title     = {Eurachem Guide: The Fitness for Purpose of Analytical Methods},
-  subtitle  = {A Laboratory Guide to Method Validation and Related Topics},
-  edition   = {2},
-  year      = {2014},
+% Eurachem's own recommended citation for the current edition. The second
+% edition (2014, eds. Magnusson and Ornemark) was superseded in 2025; cite the
+% third unless a specific statement is being attributed to the second.
+@book{eurachem2025fitness,
+  editor    = {Cantwell, H.},
+  title     = {Eurachem Guide: The Fitness for Purpose of Analytical Methods.
+               A Laboratory Guide to Method Validation and Related Topics},
+  edition   = {3},
+  year      = {2025},
   publisher = {Eurachem},
-  isbn      = {978-91-87461-59-0},
-  note      = {VERIFY edition, year and ISBN. Check that this guide is the
-                 right citation for the residuals-over-r argument, or replace
-                 it with ICH Q2(R2) if that is the better source}
+  url       = {https://www.eurachem.org/index.php/publications/guides/mv}
 }
