@@ -31,7 +31,7 @@ from __future__ import annotations
 import csv
 import re
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from icpms_qc.io import templates
 from icpms_qc.model import Analyte, Batch, InstrumentFlag, Result, Sample, SampleType
@@ -138,7 +138,17 @@ def parse_sample_file(path: str, template: str | None = "element_ascii",
     # file; that filename is the name the operator actually typed.
     name = meta.get(_META_NAME) or ""
     if not name:
-        name = Path(meta.get(_META_FILE, path)).stem
+        recorded = meta.get(_META_FILE)
+        if recorded:
+            # The Element writes this path itself and its software is Windows
+            # only, so it is a Windows path whatever we are running on. Reading
+            # it with pathlib.Path keeps the whole string on Linux, because a
+            # backslash is an ordinary character there, and the sample ends up
+            # named "E:\Data\Citro\10 ppb". PureWindowsPath also accepts the
+            # forward slashes some sites' paths come back with.
+            name = PureWindowsPath(recorded).stem
+        else:
+            name = Path(path).stem
 
     if stype is None and tpl:
         for pat, t in tpl.sample_type_patterns:
