@@ -1,5 +1,9 @@
 # icpms-qc — the QC check machine for ICP-MS batches
 
+[![PyPI](https://img.shields.io/pypi/v/icpms-qc)](https://pypi.org/project/icpms-qc/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21961353.svg)](https://doi.org/10.5281/zenodo.21961353)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Point it at your batch export. Get back a report that says whether the data can be
 reported, and why.**
 
