@@ -12,8 +12,8 @@ authors:
   - family-names: Li
     given-names: Linhan
     orcid: "https://orcid.org/0000-0002-2601-3868"
-version: 0.1.1
-date-released: "2026-08-14"
+version: 0.1.2
+date-released: "2026-08-15"
 license: MIT
 repository-code: "https://github.com/yzoe236/icpms-qc"
 url: "https://github.com/yzoe236/icpms-qc"

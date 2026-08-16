@@ -4,7 +4,7 @@
 reported, and why.**
 
 ```bash
-pip install .
+pip install icpms-qc
 icpms-qc check my_batch.csv
 ```
 
@@ -106,7 +106,7 @@ workflow. And it does not certify anything — you remain the person who signs o
 ## Quick start
 
 ```bash
-pip install .                      # from a clone; PyPI release pending name check
+pip install icpms-qc               # or: pip install 'icpms-qc[oes]' for ICP-OES workbooks
 icpms-qc check my_batch_export.csv --rules epa6020b --template masshunter_quant_wide
 # → out/qc_report.html  (human)  +  out/qc_report.json  (machines/agents)
 # exit code: 0 = all pass, 2 = QC failures, 1 = error  (CI/automation friendly)

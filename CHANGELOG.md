@@ -6,6 +6,22 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-15
+
+First release archived by Zenodo, which means it is the first one with a DOI.
+
+### Changed
+
+* The README installs from PyPI rather than from a clone. The old line said a
+  PyPI release was pending a name check; the name was free and 0.1.1 is up, so
+  the instruction was telling people to do the harder thing for no reason.
+* `CITATION.cff` carries the DOI.
+
+### Notes
+
+Zenodo only archives releases created after its hook is enabled, so 0.1.0 and
+0.1.1 have no DOI and will not get one. Cite this release or later.
+
 ## [0.1.1] - 2026-08-14
 
 First version published to PyPI. Install with `pip install icpms-qc`.
@@ -67,6 +83,7 @@ First published version.
 this has been run against real batches, but by one person and on two
 instrument families.
 
-[Unreleased]: https://github.com/yzoe236/icpms-qc/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/yzoe236/icpms-qc/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/yzoe236/icpms-qc/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/yzoe236/icpms-qc/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/yzoe236/icpms-qc/releases/tag/v0.1.0

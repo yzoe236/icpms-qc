@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "icpms-qc"
-version = "0.1.1"
+version = "0.1.2"
 description = "Post-run QC engine and audit-ready compliance reporter for ICP-MS and ICP-OES batch exports"
 readme = "README.md"
 requires-python = ">=3.10"
